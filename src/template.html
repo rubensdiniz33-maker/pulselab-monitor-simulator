@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#000000"><meta name="build" content="__BUILD__"><link rel="icon" type="image/svg+xml" href="__ICON_SVG__"><link rel="icon" type="image/png" sizes="32x32" href="__ICON_32__"><link rel="apple-touch-icon" href="__ICON_180__">
+<title>PulseLab Monitor</title>
+<style>
+:root{color-scheme:dark;--bg:#0a0f0d;--panel:#111a16;--panel2:#16221c;--line:#27382f;--fg:#e8f0ea;--mut:#92a89b;--acc:#5fe3a1;--accfg:#04130b;--red:#ff4651;--amb:#ffd23d;--cy:#3fd8ff;
+--ecg:#4dff9a;--spo2:#3fd8ff;--nibp:#f1f4f2;--co2:#ffe14d;--temp:#c9d3ce}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select{font:inherit;color:inherit}button{cursor:pointer}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.hide{display:none!important}
+/* ---------- exibição (monitor) ---------- */
+body.display{background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center}
+body.display.hidecursor{cursor:none}
+.stage{position:relative;width:min(100vw,calc(100vh*16/9));aspect-ratio:16/9;container-type:inline-size;background:#000;color:#fff;overflow:hidden;font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+.stage .top{position:absolute;inset:0 0 auto 0;height:4.4cqw;display:flex;align-items:center;gap:1.2cqw;padding:0 1cqw;border-bottom:.12cqw solid #1b2a22}
+.stage .top{background:#050907}
+.bed{display:flex;flex-direction:column;line-height:1.05;min-width:15cqw}.bed b{font-size:1.5cqw;letter-spacing:.05em}.bed span{font-size:1.05cqw;color:#9fb3a8;letter-spacing:.08em}
+.banner{flex:1;height:3cqw;display:flex;align-items:center;justify-content:center;font-size:1.75cqw;font-weight:800;letter-spacing:.06em;border-radius:.3cqw;color:#7d9186;background:transparent;white-space:nowrap;overflow:hidden}
+.banner.a3{background:#d3202a;color:#fff;animation:bR .9s steps(1) infinite}.banner.a2{background:var(--amb);color:#000;animation:bY 1.6s steps(1) infinite}.banner.a1{background:#2ec7e6;color:#00212a}
+@keyframes bR{50%{background:#7a0f16}}@keyframes bY{50%{background:#7a6100;color:#fff}}
+.tr{display:flex;align-items:center;gap:1cqw;font-size:1.5cqw;color:#cfe0d6;font-variant-numeric:tabular-nums}
+.chip{font-size:1cqw;font-weight:700;padding:.2cqw .6cqw;border-radius:.3cqw;background:#40320a;color:var(--amb);letter-spacing:.05em}.mute{font-size:1cqw;font-weight:700;color:var(--amb)}
+.main{position:absolute;inset:4.4cqw 0 2.8cqw 0;display:grid;grid-template-columns:70fr 30fr;grid-template-rows:minmax(0,1fr)}
+.waves{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:.12cqw solid #1b2a22}
+.wave{position:relative;min-height:0;flex:1;border-bottom:.1cqw solid #14211a}
+.wave canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.wl{position:absolute;left:.8cqw;top:.35cqw;font-size:1.05cqw;letter-spacing:.06em;opacity:.95;pointer-events:none;text-shadow:0 0 .4cqw #000}.wl b{font-size:1.2cqw}
+.rt{position:absolute;right:.8cqw;top:.35cqw;font-size:1.1cqw;font-weight:700;letter-spacing:.06em;color:#b6c9be;pointer-events:none}
+.frozen{position:absolute;left:35cqw;top:23cqw;transform:translate(-50%,-50%);font-size:2.6cqw;font-weight:800;letter-spacing:.2em;color:var(--amb);background:#000a;padding:.4cqw 1.4cqw;border:.15cqw solid var(--amb);border-radius:.4cqw;pointer-events:none}
+.nums{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,13fr) minmax(0,11fr) minmax(0,10.5fr) minmax(0,9.5fr) minmax(0,5fr);min-width:0;min-height:0}
+.box{grid-column:span 2;position:relative;padding:.5cqw 1cqw;border-bottom:.1cqw solid #14211a;color:var(--c);min-height:0;overflow:hidden}
+.box .lab{font-size:1.2cqw;color:#b7c8be;letter-spacing:.05em;display:flex;gap:.6cqw;align-items:baseline;white-space:nowrap}.box .lab b{color:var(--c);font-size:1.45cqw}
+.lim{margin-left:auto;font-size:1cqw;color:#8da298}
+.val{font-size:9cqw;line-height:1;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin-top:.1cqw;white-space:nowrap}
+.sub{position:absolute;right:1cqw;bottom:.6cqw;font-size:1.25cqw;color:#c4d3ca;text-align:right;line-height:1.25}.sub b{color:var(--c);font-weight:700}
+#b-hr{--c:var(--ecg)}#b-spo2{--c:var(--spo2)}#b-nibp{--c:var(--nibp)}#b-etco2,#b-rr{--c:var(--co2)}#b-temp{--c:var(--temp)}
+#b-spo2 .val{font-size:8cqw}#b-nibp .val{font-size:6cqw;margin-top:.5cqw}#b-nibp .val.dash{font-size:4.2cqw;margin-top:1.3cqw;letter-spacing:.1em}#b-nibp .sub{max-width:11cqw}
+.box.half{grid-column:span 1;border-right:.1cqw solid #14211a}#b-etco2 .val,#b-rr .val{font-size:5.8cqw;margin-top:.3cqw}
+.xbtn{display:none}body.embed .xbtn{display:flex;position:absolute;top:3px;right:3px;width:18px;height:18px;z-index:4;background:#000c;border:1px solid #ffffff66;color:#fff;border-radius:50%;align-items:center;justify-content:center;padding:0;font:14px/1 system-ui;cursor:pointer}body.embed .xbtn:hover{background:#c0392b;border-color:#fff}
+body.embed .edit{cursor:grab}body.embed .edit.dragging{opacity:.35}body.embed .edit.over{outline:2px dashed var(--ecg);outline-offset:-2px}body.embed .rt{right:30px}body.embed .lim{margin-right:24px}
+#b-temp{display:flex;align-items:center;gap:1cqw;padding-top:0;padding-bottom:0}#b-temp .val{font-size:3.2cqw;margin:0}#b-temp .lab{font-size:1.2cqw}
+.dot{display:inline-block;width:.9cqw;height:.9cqw;border-radius:50%;background:var(--ecg);opacity:.15;margin-left:.3cqw;align-self:center}.dot.on{opacity:1;box-shadow:0 0 .8cqw var(--ecg)}
+.box.al3{outline:.22cqw solid var(--red);outline-offset:-.22cqw;animation:fR .9s steps(1) infinite}.box.al2{outline:.22cqw solid var(--amb);outline-offset:-.22cqw;animation:fY 1.6s steps(1) infinite}.box.al1{outline:.18cqw solid var(--cy);outline-offset:-.18cqw}
+@keyframes fR{50%{background:#4d0b10}}@keyframes fY{50%{background:#3d3000}}
+@media(prefers-reduced-motion:reduce){.banner.a3,.banner.a2,.box.al3,.box.al2{animation:none}}
+.foot{position:absolute;inset:auto 0 0 0;height:2.8cqw;display:flex;align-items:center;justify-content:space-between;gap:1cqw;padding:0 1cqw;font-size:.95cqw;color:#7f9387;letter-spacing:.05em;border-top:.1cqw solid #14211a;background:#050907;white-space:nowrap}
+.foot .mid{color:#9bb0a4;font-weight:700}
+.sndst{color:#9bb0a4;font-weight:700}.sndst.off{color:#c9902a}
+.gate{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2cqw;background:rgba(0,0,0,.8);color:#fff;text-align:center;cursor:pointer;border:0;width:100%;font-family:inherit}
+.gate b{font-size:3cqw;letter-spacing:.14em}.gate span{font-size:1.4cqw;color:#b6c9be;letter-spacing:.04em;max-width:60cqw;line-height:1.5}.gate i{font-style:normal;font-size:1.3cqw;font-weight:800;letter-spacing:.14em;padding:.7cqw 2cqw;border:.15cqw solid var(--ecg);color:var(--ecg);border-radius:.4cqw}
+.tag{position:absolute;right:1cqw;top:4.9cqw;font-size:.9cqw;letter-spacing:.2em;color:#ffffff33;pointer-events:none;display:none}
+body.embed .gate,body.embed .sndst{display:none}
+/* ---------- console do professor ---------- */
+body.console{overflow:auto;min-width:1000px}
+.top2{position:sticky;top:0;z-index:5;height:50px;display:flex;align-items:center;gap:8px;padding:0 14px;background:#0a110e;border-bottom:1px solid var(--line)}
+.top2 .btn{white-space:nowrap}.top2 .brand{white-space:nowrap}@media(max-width:1560px){#openfs,#p-t{display:none}}@media(max-width:1280px){#restart,#p-disp{display:none}}
+.brand{font-weight:900;letter-spacing:.18em;font-size:13px;margin-right:6px}.brand span{color:var(--acc)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border:1px solid var(--line);border-radius:4px;font-size:12px;color:var(--mut);background:var(--panel);white-space:nowrap}
+.pill i{width:8px;height:8px;border-radius:50%;background:#5b6f64;display:inline-block}.pill.ok i{background:var(--acc);box-shadow:0 0 6px var(--acc)}.pill.warn i{background:var(--amb)}.pill.bad i{background:var(--red)}
+.sp{flex:1}
+.cwrap{display:grid;grid-template-columns:268px minmax(0,1fr) 440px;gap:10px;padding:10px 12px;height:calc(100vh - 50px);min-height:620px}
+.cwrap>*{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:5px;flex:none}
+.ph{padding:7px 12px;font-size:11px;letter-spacing:.12em;font-weight:800;color:var(--mut);border-bottom:1px solid var(--line);text-transform:uppercase;display:flex;justify-content:space-between;gap:8px;align-items:center;min-height:32px}
+.pb{padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--panel2);border-radius:4px;padding:6px 11px;font-weight:600;font-size:13px}.btn:hover{border-color:#5d8f75}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:var(--accfg);font-weight:800}.btn.dan{border-color:#7a2a30;color:#ff9aa0}.btn[disabled]{opacity:.4;cursor:not-allowed}
+.btn.sm{padding:3px 8px;font-size:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tabs{display:flex;border-bottom:1px solid var(--line);background:#0b130f;overflow-x:auto}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:9px 13px;color:var(--mut);font-weight:700;white-space:nowrap;font-size:13px}.tab.on{color:var(--acc);border-bottom-color:var(--acc);background:var(--panel)}
+.page{display:none}.page.on{display:block}
+.sgrp{font-size:10.5px;letter-spacing:.14em;color:#6f867a;font-weight:800;padding:7px 12px 2px;text-transform:uppercase}
+.scl{display:flex;flex-direction:column;padding-bottom:6px}
+.sc{display:flex;align-items:baseline;gap:8px;text-align:left;padding:3px 12px;border:0;border-left:3px solid transparent;background:transparent;width:100%}.sc:hover{background:var(--panel2)}
+.sc .n{font-size:11px;color:#6f867a;width:12px;flex:none;font-variant-numeric:tabular-nums}.sc b{font-size:13px;font-weight:600;line-height:1.3}.sc small{display:block;color:var(--mut);font-size:11px;font-weight:400;line-height:1.25}.sc.on{border-left-color:var(--acc);background:#0f2318}.sc.on b{color:var(--acc)}
+.qgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:8px}
+.qc{border:1px solid var(--line);border-radius:4px;padding:6px 8px;background:#0c1511;min-width:0}
+.qc .ql{display:flex;justify-content:space-between;font-size:11.5px;color:#c3d3c9;font-weight:700;letter-spacing:.04em}.qc .ql small{color:var(--mut);font-weight:400}
+.qv{display:flex;align-items:center;gap:4px;margin:3px 0}
+.qv input{flex:1;min-width:0;width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--fg);font-size:22px;font-weight:600;text-align:center;font-variant-numeric:tabular-nums;padding:0}
+.qv input::-webkit-inner-spin-button{display:none}
+.stp{width:26px;height:26px;border:1px solid var(--line);background:var(--panel2);border-radius:4px;font-size:16px;line-height:1;padding:0;flex:none}.stp:hover{border-color:var(--acc)}
+.qc input[type=range]{width:100%;accent-color:var(--acc);margin:0;height:14px}
+.qc.lock{opacity:.4}.why{display:none;font-size:11px;color:var(--amb);margin-top:2px}.qc.lock .why{display:block}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px 18px}
+#pg-al .fgrid,#pg-ds .fgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.f label.chk{justify-content:flex-start;margin:0}.f label{display:flex;justify-content:space-between;font-size:12.5px;color:#c3d3c9;margin-bottom:4px;gap:8px}
+.f input[type=number],.f select,.f input[type=text]{background:#08100c;border:1px solid var(--line);border-radius:4px;padding:6px 8px;width:100%}
+.f input[type=range]{width:100%;accent-color:var(--acc)}
+select{background:#08100c;border:1px solid var(--line);border-radius:4px;padding:5px 7px}
+.hint{font-size:12px;color:var(--mut)}.note{font-size:12px;color:var(--amb)}
+.prev{aspect-ratio:16/9;width:100%;border:0;background:#000;display:block}
+.pvw{width:100%;background:#000}.cols2{display:grid;grid-template-columns:1fr 1fr;gap:18px}.btn.bas{border-color:var(--acc);color:var(--acc)}.btn.bas:hover{background:#10281b}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:12.5px}.kv span{color:var(--mut)}.kv b{text-align:right;font-variant-numeric:tabular-nums}
+.alist{display:flex;flex-direction:column;gap:5px;font-size:12.5px;font-weight:700}.al{padding:5px 9px;border-radius:3px}.al.p3{background:#5a1218;color:#ffb3b8}.al.p2{background:#4a3a00;color:#ffe48a}.al.p1{background:#0d3a45;color:#9fe8ff}
+.ro{background:#3a1a1d;border-bottom:1px solid #7a2a30;padding:8px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;color:#ffb3b8}
+body.readonly .cwrap .panel:not(.keep) .pb,body.readonly .cwrap .tabs{pointer-events:none;opacity:.5}
+/*REMOTE_CSS*/
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#d9ffe9;color:#06210f;padding:9px 16px;border-radius:5px;font-weight:700;opacity:0;pointer-events:none;transition:opacity .15s;z-index:30;max-width:90vw}.toast.on{opacity:1}
+.phb{height:5px;background:#0a120e;border-radius:3px;overflow:hidden}.phb i{display:block;height:100%;background:var(--acc);width:0}
+.chk{display:flex;gap:8px;align-items:center;font-size:13px}
+@media(max-width:1250px){body.console{min-width:0}.cwrap{grid-template-columns:1fr;height:auto}.cwrap>*{overflow:visible}.cols2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div class="toast" id="toast"></div>
+<script type="text/plain" id="vend-peer">/*PEERJS*/</script>
+<script type="text/plain" id="vend-qr">/*QRCODE*/</script>
+<script>
+/*ENGINE*/
+</script>
+<script>
+(() => {
+'use strict';
+const { SIM0, FS, RING, clamp, KEYS, LIMITS, PULSELESS, clockT, TtoP, clockP, truth, Core, nibpResult, cuffPressure, NIBP_SECONDS, rhythmRules, couple, SCENARIOS, defaultSession, sanitize, DEFAULT_DISPLAY } = ENGINE;
+const $ = (id, r) => (r || document).getElementById(id);
+const qs = new URLSearchParams(location.search);
+const smallTouch = !qs.get('mode') && !!window.matchMedia && matchMedia('(max-width: 700px) and (pointer: coarse)').matches;
+const MODE = (qs.get('mode') === 'projection' || qs.get('mode') === 'monitor') ? 'display' : (qs.get('mode') === 'remote' || smallTouch) ? 'remote' : 'console';
+const EMBED = qs.get('embed') === '1';
+const BUILD = (document.querySelector('meta[name=build]') || {}).content || 'dev';
+const LS = 'pulselab:session:v2', CHN = 'pulselab-v2', myId = Math.random().toString(36).slice(2, 8);
+const bc = 'BroadcastChannel' in window ? new BroadcastChannel(CHN) : null;
+const post = m => { m.id = myId; try { bc && bc.postMessage(m); } catch (e) {} };
+function loadS() { try { const r = localStorage.getItem(LS); if (r) return sanitize(JSON.parse(r)); const v1 = localStorage.getItem('pulselab-state-v1'); if (v1) return sanitize(JSON.parse(v1)); } catch (e) {} return defaultSession(); }
+function saveS(S) { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} }
+const SC = Object.fromEntries(SCENARIOS.map(s => [s.id, s]));
+const RH = { sinus: 'Sinusal', afib: 'Fibrilação atrial', flutter: 'Flutter atrial', svt: 'Taquicardia supraventricular', avb3: 'BAV total', tdp: 'Torsades de pointes', vt: 'TV monomórfica (com pulso)', vtp: 'TV sem pulso', vf: 'Fibrilação ventricular', asys: 'Assistolia', pea: 'AESP', leadoff: 'Eletrodo solto' };
+const PAR = [['hr', 'Frequência cardíaca', 'bpm', 0, 250, 1, 'FC'], ['sys', 'PA sistólica', 'mmHg', 0, 300, 1, 'PAS'], ['dia', 'PA diastólica', 'mmHg', 0, 200, 1, 'PAD'], ['rr', 'Frequência respiratória', 'irpm', 0, 60, 1, 'FR'], ['spo2', 'SpO₂', '%', 0, 100, 1, 'SpO₂'], ['etco2', 'EtCO₂', 'mmHg', 0, 100, 1, 'EtCO₂'], ['temp', 'Temperatura', '°C', 26, 43, 0.1, 'TEMP']];
+const DURS = [[0, 'imediato'], [10, '10 s'], [30, '30 s'], [60, '1 min'], [120, '2 min'], [300, '5 min'], [600, '10 min']];
+const GROUPS = [['Normal', ['basal', 'taqui', 'brady']], ['Choque e deterioração', ['hemo', 'sepse', 'cardio', 'anafi', 'tamp', 'pneumo']], ['Respiratório e metabólico', ['hipox', 'dpoc', 'tep', 'edema', 'opioide', 'cad']], ['Arritmias e artefato', ['fa', 'fl', 'tsv', 'bav', 'esv', 'vt', 'lead']], ['Outras emergências', ['iam', 'hiper', 'hm', 'hipot', 'rosc']], ['Parada cardíaca', ['vtp', 'vf', 'tdp', 'asys', 'pea']]];
+/*REMOTE_JS*/
+const fmt = v => v === null || v === undefined ? '---' : v;
+const temp1 = t => Number(t).toFixed(1).replace('.', ',');
+function rhythmLabel(S, hr) {
+  if (S.rhythm === 'sinus') { if (hr !== null && hr > 100) return 'TAQUICARDIA SINUSAL'; if (hr !== null && hr < 60) return 'BRADICARDIA SINUSAL'; return 'RITMO SINUSAL'; }
+  return (RH[S.rhythm] || '').toUpperCase().replace(' (COM PULSO)', '');
+}
+function toast(s) { const t = $('toast'); t.textContent = s; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 2600); }
+
+/* =================== EXIBIÇÃO =================== */
+const MON = `<div class="stage" id="stage">
+<div class="top"><div class="bed"><b id="bed"></b><span id="pname"></span></div><div class="banner" id="banner"><span id="bantxt">&nbsp;</span></div><div class="tr"><span id="chip" class="chip hide"></span><span id="mute" class="mute hide"></span><span id="clock"></span></div></div>
+<div class="main"><div class="waves">
+<div class="wave" id="w-ecg"><canvas class="g"></canvas><canvas class="t"></canvas><div class="wl" style="color:var(--ecg)"><b>ECG</b> II &nbsp;<span id="l-ecg"></span></div><div class="rt" id="rhy"></div></div>
+<div class="wave" id="w-pleth"><canvas class="g"></canvas><canvas class="t"></canvas><div class="wl" style="color:var(--spo2)"><b>PLETH</b> SpO₂</div></div>
+<div class="wave" id="w-resp"><canvas class="g"></canvas><canvas class="t"></canvas><div class="wl" style="color:var(--co2)"><b>RESP</b> impedância</div></div>
+<div class="wave" id="w-capno"><canvas class="g"></canvas><canvas class="t"></canvas><div class="wl" style="color:var(--co2)"><b>CO₂</b> <span id="l-co2"></span></div></div>
+<div class="frozen hide" id="frozen">CONGELADO</div>
+</div><div class="nums" id="nums">
+<div class="box" id="b-hr"><div class="lab"><b>FC</b> bpm<i class="dot" id="dot"></i><span class="lim" id="lim-hr"></span></div><div class="val" id="v-hr">---</div></div>
+<div class="box" id="b-spo2"><div class="lab"><b>SpO₂</b> %<span class="lim" id="lim-spo2"></span></div><div class="val" id="v-spo2">---</div><div class="sub">FC pulso<br><b id="v-pr">---</b></div></div>
+<div class="box" id="b-nibp"><div class="lab"><b>PNI</b> mmHg<span class="lim" id="lim-nibp"></span></div><div class="val" id="v-nibp">---/---</div><div class="sub" id="s-nibp">&nbsp;</div></div>
+<div class="box" id="b-etco2"><div class="lab"><b>EtCO₂</b> mmHg</div><div class="val" id="v-etco2">---</div><div class="sub" id="lim-etco2"></div></div><div class="box" id="b-rr"><div class="lab"><b>FR</b> irpm</div><div class="val" id="v-rr">---</div><div class="sub" id="lim-rr"></div></div>
+<div class="box" id="b-temp"><div class="lab"><b>TEMP</b> °C</div><div class="val" id="v-temp">---</div></div>
+</div></div>
+<div class="foot"><span id="f-left"></span><span class="mid">Criado por Enf. Rubens Diniz</span><span><span class="sndst off" id="sndst"></span> &nbsp;build <span id="f-build"></span></span></div>
+<button class="gate hide" id="gate" type="button"><b>TOQUE PARA INICIAR A PROJEÇÃO</b><span>Um clique libera o som dos alarmes e do bip de batimento. Depois disso o som funciona sozinho, sem pedir de novo.</span><i>INICIAR</i></button>
+</div>`;
+
+function startDisplay() {
+  document.body.classList.add('display'); if (EMBED) document.body.classList.add('embed');
+  document.title = 'PulseLab · Projeção';
+  $('root').innerHTML = MON;
+  let S = loadS(), lastCtl = 0, seenCtl = false;
+  const core = new Core(), now = () => Date.now();
+  core.setState(S, clockT(S.clock, now()));
+  const stage = $('stage'), CHD = [
+    { k: 'ecg', buf: 'ecg', sp: 'speed' }, { k: 'pleth', buf: 'pl', sp: 'speed' }, { k: 'resp', buf: 'rs', sp: 'speed2' }, { k: 'capno', buf: 'co', sp: 'speed2' }
+  ].map(o => { const w = $('w-' + o.k); return Object.assign(o, { w, g: w.querySelector('.g'), t: w.querySelector('.t'), W: 0, H: 0, lastN: null, dirty: true }); });
+  const COL = { green: '#4dff9a', amber: '#ffc34d', white: '#f1f4f2' };
+  const colorOf = c => c.k === 'ecg' ? COL[S.display.ecgcolor] || COL.green : c.k === 'pleth' ? '#3fd8ff' : '#ffe14d';
+  const yOf = (c, s) => {
+    const H = c.H, D = S.display;
+    if (c.k === 'ecg') return H * 0.62 - s * D.gain * 10 * (c.W / 150);
+    if (c.k === 'pleth') return H * 0.88 - s * H * 0.58;
+    if (c.k === 'resp') return H * 0.85 - s * H * 0.7;
+    return H * 0.9 - (s / D.capScale) * H * 0.78;
+  };
+  function sizeAll() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    for (const c of CHD) {
+      const r = c.w.getBoundingClientRect(), W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
+      if (!W || !H) { c.W = 0; continue; }
+      if (c.W !== W || c.H !== H || c.dpr !== dpr) { c.W = W; c.H = H; c.dpr = dpr; c.g.width = c.t.width = W; c.g.height = c.t.height = H; c.dirty = true; }
+    }
+  }
+  function grid(c) {
+    const x = c.g.getContext('2d'), W = c.W, H = c.H, pxmm = W / 150, D = S.display;
+    x.clearRect(0, 0, W, H); x.lineWidth = Math.max(1, c.dpr * 0.6);
+    if (c.k === 'ecg') {
+      if (D.grid && pxmm >= 2.5) {
+        for (let i = 0; i * pxmm < W; i++) { x.strokeStyle = i % 5 ? 'rgba(77,255,154,.09)' : 'rgba(77,255,154,.22)'; x.beginPath(); x.moveTo(i * pxmm, 0); x.lineTo(i * pxmm, H); x.stroke(); }
+        for (let j = 0; j * pxmm < H; j++) { x.strokeStyle = j % 5 ? 'rgba(77,255,154,.09)' : 'rgba(77,255,154,.22)'; x.beginPath(); x.moveTo(0, j * pxmm); x.lineTo(W, j * pxmm); x.stroke(); }
+      }
+    } else {
+      x.strokeStyle = 'rgba(255,255,255,.10)'; x.setLineDash([4 * c.dpr, 6 * c.dpr]);
+      if (c.k === 'capno') {
+        const step = D.capScale === 100 ? 25 : 10; x.font = (c.H * 0.1) + 'px system-ui'; x.fillStyle = 'rgba(255,255,255,.35)';
+        for (let v = 0; v <= D.capScale; v += step) { const y = yOf(c, v); x.beginPath(); x.moveTo(0, y); x.lineTo(W, y); x.stroke(); x.fillText(v, W - c.H * 0.25, y - 3 * c.dpr); }
+      } else { const y = yOf(c, 0); x.beginPath(); x.moveTo(0, y); x.lineTo(W, y); x.stroke(); }
+      x.setLineDash([]);
+    }
+  }
+  function strokeRange(c, gen, a, b) {
+    const x = c.t.getContext('2d'), buf = gen[c.buf], v = c.v, W = c.W;
+    x.strokeStyle = colorOf(c); x.lineWidth = Math.max(2 * c.dpr, W * 0.0023); x.lineJoin = 'round'; x.lineCap = 'round';
+    x.beginPath(); let px = -1, st = false;
+    for (let n = a; n <= b; n++) {
+      const X = ((n / FS) * v) % W, Y = yOf(c, buf[n % RING]);
+      if (!st || X < px) { if (st) { x.stroke(); x.beginPath(); } x.moveTo(X, Y); st = true; } else x.lineTo(X, Y);
+      px = X;
+    }
+    x.stroke();
+  }
+  function clearRange(c, x1, len) {
+    const x = c.t.getContext('2d'), W = c.W; x1 = ((x1 % W) + W) % W;
+    if (x1 + len > W) { x.clearRect(x1, 0, W - x1, c.H); x.clearRect(0, 0, x1 + len - W, c.H); } else x.clearRect(x1, 0, len, c.H);
+  }
+  function drawChan(c, gen) {
+    if (!c.W) return; const N = gen.n; if (N <= gen.n0 + 1) return;
+    c.v = S.display[c.sp] * (c.W / 150); c.pps = c.v / FS; c.gap = Math.max(10 * c.dpr, c.W * 0.03);
+    const head = n => ((n / FS) * c.v) % c.W;
+    if (c.dirty) { grid(c); c.lastN = null; c.dirty = false; }
+    const x = c.t.getContext('2d');
+    if (c.lastN === null || c.lastN < gen.n0 || (N - 1 - c.lastN) * c.pps > c.W - c.gap || N - 1 - c.lastN > RING - 10) {
+      x.clearRect(0, 0, c.W, c.H);
+      const a = Math.max(gen.n0, N - 1 - Math.floor((c.W - c.gap) / c.pps), N - RING + 10);
+      strokeRange(c, gen, a, N - 1); clearRange(c, head(N), c.gap);
+    } else if (N - 1 > c.lastN) {
+      const hp = head(c.lastN + 1), hn = head(N), dx = (((hn - hp) % c.W) + c.W) % c.W;
+      clearRange(c, hp + c.gap - 1, dx + 2);
+      strokeRange(c, gen, c.lastN, N - 1);
+    }
+    c.lastN = N - 1;
+  }
+  const WW = { ecg: 17, pleth: 9.5, resp: 9, capno: 13.5 }, NW = { hr: 13, spo2: 11, nibp: 10.5, pair: 9.5, temp: 5 };
+  function applyLayout() {
+    const Ly = S.layout, hid = new Set(Ly.hidden);
+    Ly.waves.forEach((id, i) => { const el = $('w-' + id); el.style.order = i; el.style.flex = WW[id]; el.classList.toggle('hide', hid.has(id)); });
+    Ly.nums.forEach((id, i) => { const el = $('b-' + id); el.style.order = i; el.classList.toggle('hide', hid.has(id)); el.classList.remove('half'); });
+    const vis = Ly.nums.filter(id => !hid.has(id)), rows = [];
+    for (let i = 0; i < vis.length; i++) { const a = vis[i], b = vis[i + 1], pr = (a === 'etco2' && b === 'rr') || (a === 'rr' && b === 'etco2'); if (pr) { $('b-' + a).classList.add('half'); $('b-' + b).classList.add('half'); rows.push(NW.pair); i++; } else rows.push(NW[a === 'etco2' || a === 'rr' ? 'pair' : a]); }
+    $('nums').style.gridTemplateRows = rows.map(w => 'minmax(0,' + w + 'fr)').join(' ');
+  }
+  function applySettings(first) {
+    const D = S.display;
+    $('bed').textContent = D.bed; $('pname').textContent = D.name;
+    applyLayout();
+    $('l-ecg').textContent = D.speed.toString().replace('.', ',') + ' mm/s · ×' + D.gain + ' (' + (10 * D.gain) + ' mm/mV)';
+    $('l-co2').textContent = '0–' + D.capScale + ' mmHg · ' + D.speed2.toString().replace('.', ',') + ' mm/s';
+    $('f-left').textContent = 'ECG ' + D.speed.toString().replace('.', ',') + ' mm/s · ' + (10 * D.gain) + ' mm/mV · RESP/CO₂ ' + D.speed2.toString().replace('.', ',') + ' mm/s';
+    const L = Object.assign({}, LIMITS, S.alarm.limits);
+    $('lim-hr').textContent = L.hrLo + '–' + L.hrHi; $('lim-spo2').textContent = L.spo2Lo + '–100'; $('lim-nibp').textContent = 'PAS ' + L.sysLo + '–' + L.sysHi;
+    $('lim-etco2').innerHTML = L.etLo + '–' + L.etHi; $('lim-rr').innerHTML = L.rrLo + '–' + L.rrHi;
+    document.documentElement.style.setProperty('--ecg', COL[D.ecgcolor] || COL.green);
+    $('f-build').textContent = BUILD.startsWith('__') ? 'dev' : BUILD.slice(0, 7);
+    sizeAll(); CHD.forEach(c => c.dirty = true);
+  }
+  function onState(ns) {
+    ns = sanitize(ns);
+    if (ns.rev <= S.rev && !(ns.epoch !== S.epoch)) return;
+    const prev = S; S = ns; core.setState(S, clockT(S.clock, now()));
+    if (prev.epoch !== S.epoch) CHD.forEach(c => c.lastN = null);
+    applySettings();
+  }
+  if (bc) bc.onmessage = e => {
+    const m = e.data || {};
+    if (m.t === 'state' && m.s) { lastCtl = now(); seenCtl = true; onState(m.s); }
+    else if (m.t === 'chb') { lastCtl = now(); seenCtl = true; }
+  };
+  window.addEventListener('storage', e => { if (e.key === LS && e.newValue) { try { onState(JSON.parse(e.newValue)); } catch (err) {} } });
+  post({ t: 'hello' });
+  applySettings();
+  if (EMBED) {
+    let dragGrp = null;
+    [...CHD.map(c => c.w), ...document.querySelectorAll('.box')].forEach(el => {
+      const id = el.id.slice(2), grp = el.id[0] === 'w' ? 'waves' : 'nums'; el.draggable = true; el.classList.add('edit');
+      const x = document.createElement('button'); x.className = 'xbtn'; x.type = 'button'; x.textContent = '×'; x.title = 'Ocultar este painel'; x.setAttribute('aria-label', 'Ocultar painel'); x.draggable = false;
+      x.onclick = ev => { ev.stopPropagation(); post({ t: 'layout', op: 'hide', pid: id }); }; el.appendChild(x);
+      el.addEventListener('dragstart', e => { dragGrp = grp; e.dataTransfer.setData('text/plain', grp + ':' + id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('dragging'); });
+      el.addEventListener('dragend', () => { el.classList.remove('dragging'); document.querySelectorAll('.over').forEach(n => n.classList.remove('over')); });
+      el.addEventListener('dragover', e => { if (dragGrp === grp) { e.preventDefault(); el.classList.add('over'); } });
+      el.addEventListener('dragleave', () => el.classList.remove('over'));
+      el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('over'); const [g, from] = (e.dataTransfer.getData('text/plain') || ':').split(':'); if (g !== grp || from === id) return; post({ t: 'layout', op: 'swap', group: grp, pid: from, before: id }); });
+    });
+  }
+  new ResizeObserver(() => { sizeAll(); }).observe(stage);
+
+  /* som: Web Audio sintetizado. O navegador exige UM clique por carga de página; a tela inicial pede esse clique uma vez.
+     O estado do áudio é local desta página e nunca é alterado pela sincronização de parâmetros. */
+  let actx = null, nextSnd = 0, lastTop = 0, busyUntil = 0, lastBeepT = clockT(S.clock, now()), unlocked = false;
+  const wantFs = qs.get('fullscreen') === '1';
+  function setUnlocked(v) {
+    unlocked = v; $('gate').classList.toggle('hide', v || EMBED);
+    const st = $('sndst'); st.textContent = EMBED ? '' : (v ? 'SOM ATIVO' : 'SOM DESLIGADO · CLIQUE NA TELA'); st.classList.toggle('off', !v);
+  }
+  function initAudio() {
+    if (EMBED) return;
+    try { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) { $('sndst').textContent = 'SOM INDISPONÍVEL'; return; } actx = new AC(); actx.onstatechange = () => setUnlocked(actx.state === 'running'); setUnlocked(actx.state === 'running'); } catch (e) { setUnlocked(false); }
+  }
+  async function unlock(fromUser) {
+    if (EMBED) return; try { if (!actx) initAudio(); if (actx && actx.state !== 'running') await actx.resume(); } catch (e) {}
+    setUnlocked(!!actx && actx.state === 'running');
+    if (fromUser) { try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch (e) {} if (wantFs && !document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {}); }
+  }
+  if (!EMBED) {
+    initAudio(); setUnlocked(unlocked);
+    $('gate').onclick = () => unlock(true);
+    for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, () => { if (!unlocked) unlock(true); }, { capture: true });
+    for (const ev of ['visibilitychange', 'focus']) window.addEventListener(ev, () => { if (actx && actx.state === 'suspended' && !document.hidden) actx.resume().catch(() => {}); });
+  }
+  function tone(t, f, d, vol) { const o = actx.createOscillator(), g = actx.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.006); g.gain.setValueAtTime(vol, t + Math.max(0.01, d - 0.02)); g.gain.linearRampToValueAtTime(0, t + d); o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + d + 0.02); }
+  function alarmSound(prio) {
+    if (!actx || !unlocked || EMBED || S.audio.mute) return; const vol = 0.32 * S.audio.vol / 100; if (vol <= 0) return; const t0 = actx.currentTime + 0.02;
+    if (prio === 3) { for (let b = 0; b < 2; b++) for (let i = 0; i < 5; i++) tone(t0 + b * 1.05 + i * 0.17, 988, 0.11, vol); busyUntil = performance.now() + 2300; }
+    else if (prio === 2) { for (let i = 0; i < 3; i++) tone(t0 + i * 0.24, 740, 0.16, vol); busyUntil = performance.now() + 900; }
+    else { for (let i = 0; i < 2; i++) tone(t0 + i * 0.3, 523, 0.2, vol); busyUntil = performance.now() + 700; }
+  }
+  function beepNow(spo2) {
+    if (!actx || !unlocked || S.audio.mute) return; const A = S.audio, vol = 0.28 * A.beepVol / 100; if (vol <= 0) return;
+    const f = A.beepSrc === 'spo2' ? 560 + (clamp(spo2 === null || spo2 === undefined ? 98 : spo2, 70, 100) - 70) * 10 : 880;
+    tone(actx.currentTime + 0.005, f, 0.07, vol);
+  }
+  function beeps(T) {
+    const A = S.audio; if (!unlocked || EMBED) { lastBeepT = T; return; }
+    if (!A.beep || !S.clock.running) { lastBeepT = T; return; }
+    const ev = A.beepSrc === 'spo2' ? core.gen.ev.pulse : core.gen.ev.qrs, fresh = [];
+    for (let i = ev.length - 1; i >= 0; i--) { const e = ev[i]; if (e.t <= lastBeepT) break; if (e.t <= T) fresh.push(e); }
+    lastBeepT = T; if (!fresh.length || performance.now() < busyUntil) return;
+    const last = fresh[0]; if (T - last.t > 0.3) return;
+    beepNow(core.meas.v.spo2);
+  }
+  if (bc) bc.addEventListener('message', e => { const m = e.data || {}; if (m.t === 'test' && !EMBED) { unlock(false).then(() => { if (m.what === 'beep') beepNow(98); else alarmSound(Number(m.what) || 2); }); } });
+
+  let lastNum = 0, lastHb = 0;
+  function nums(T) {
+    const m = core.meas.v, tr = core.truthAt(T), L = Object.assign({}, LIMITS, S.alarm.limits);
+    $('v-hr').textContent = fmt(m.hr); $('v-spo2').textContent = fmt(m.spo2); $('v-pr').textContent = fmt(m.pr);
+    $('v-etco2').textContent = fmt(m.etco2); $('v-rr').textContent = fmt(m.rr); $('v-temp').textContent = temp1(m.temp === null ? tr.temp : m.temp);
+    $('rhy').textContent = rhythmLabel(S, m.hr);
+    const N = S.nibp; let val = '---/---', sub = '', meas = false;
+    if (N.state === 'meas' && T >= N.startT && T <= N.startT + NIBP_SECONDS + 4) { if (N.res && N.res.ok) val = N.res.sys + '/' + N.res.dia; sub = 'MEDINDO<br>' + Math.round(cuffPressure(T - N.startT, 170)) + ' mmHg'; meas = true; }
+    else if (N.res && N.res.ok) { val = N.res.sys + '/' + N.res.dia; const d = new Date(N.res.wall); sub = 'PAM ' + N.res.map + '<br>' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+    else if (N.res && !N.res.ok) sub = 'SEM LEITURA<br>verificar pulso'; else sub = 'AGUARDANDO';
+    sub += '<br>' + (N.every > 0 ? 'AUTO ' + Math.round(N.every / 60) + ' min' : 'MANUAL');
+    $('v-nibp').textContent = val; $('v-nibp').classList.toggle('dash', val === '---/---'); $('v-nibp').style.opacity = meas ? '.4' : ''; $('s-nibp').innerHTML = sub;
+    $('clock').textContent = new Date().toLocaleTimeString('pt-BR', { hour12: false });
+    $('frozen').classList.toggle('hide', S.clock.running);
+    // alarmes
+    const al = core.alm.list, top = al.length ? al[0].prio : 0, silenced = S.alarm.silencedUntil > now();
+    const ban = $('banner'); ban.className = 'banner' + (top ? ' a' + top : '');
+    $('bantxt').textContent = al.length ? al.slice(0, 2).map(a => a.text).join('  ·  ') : (S.alarm.on ? ' ' : 'ALARMES DESLIGADOS');
+    for (const p of ['hr', 'spo2', 'nibp', 'rr', 'etco2', 'temp']) { const pr = Math.max(0, ...al.filter(a => a.param === p).map(a => a.prio)); const bx = $('b-' + p); bx.classList.remove('al1', 'al2', 'al3'); if (pr) bx.classList.add('al' + pr); }
+    const mu = $('mute'); if (silenced) { const s = Math.ceil((S.alarm.silencedUntil - now()) / 1000); mu.textContent = 'SOM PAUSADO ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); mu.classList.remove('hide'); } else mu.classList.add('hide');
+    const chip = $('chip'); if (!EMBED && seenCtl && now() - lastCtl > 10000) { chip.textContent = 'SEM SINAL DO CONTROLE · ' + Math.round((now() - lastCtl) / 1000) + ' s'; chip.classList.remove('hide'); } else chip.classList.add('hide');
+    if (top > lastTop) nextSnd = 0; lastTop = top;
+    if (top && S.alarm.sound && !silenced && now() >= nextSnd) { alarmSound(top); nextSnd = now() + (top === 3 ? 6000 : top === 2 ? 10000 : 20000); }
+    if (!top) nextSnd = 0;
+    if (now() - lastHb > 1000) { lastHb = now(); post({ t: 'hb', embed: EMBED, audio: EMBED ? 'none' : (unlocked ? 'ok' : 'wait'), alarms: al.map(a => ({ text: a.text, prio: a.prio })), T, m }); }
+  }
+  function frame() {
+    const T = clockT(S.clock, now());
+    core.advance(T);
+    for (const c of CHD) drawChan(c, core.gen);
+    beeps(T);
+    const q = core.gen.ev.qrs, dot = $('dot'); let on = false; for (let i = q.length - 1; i >= 0 && i > q.length - 4; i--) if (q[i].t <= T && T - q[i].t < 0.12) on = true; dot.classList.toggle('on', on);
+    if (performance.now() - lastNum > 250) { lastNum = performance.now(); nums(T); }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) CHD.forEach(c => c.lastN = null); });
+  if (!EMBED) {
+    let ch; const hc = () => { document.body.classList.remove('hidecursor'); clearTimeout(ch); ch = setTimeout(() => document.body.classList.add('hidecursor'), 3000); };
+    window.addEventListener('mousemove', hc); hc();
+    window.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') { if (!document.fullscreenElement) document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); else document.exitFullscreen(); } });
+    if (qs.get('fullscreen') === '1') setTimeout(() => document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}), 400);
+  }
+  window.__pl = { core, get S() { return S; }, CHD };
+}
+
+/* =================== CONSOLE =================== */
+function startConsole() {
+  document.body.classList.add('console');
+  document.title = 'PulseLab · Console do professor';
+  var RM = null; let S = loadS(), readOnly = false, live = true, tab = 'al', draft = null, dtimer = null;
+  const now = () => Date.now(), curT = () => clockT(S.clock, now()), curP = () => clockP(S.clock, now());
+  const displays = new Map(), LOG = [], seenAl = new Set();
+  const simT = () => { const T = Math.max(0, curT() - SIM0); return Math.floor(T / 60) + ':' + String(Math.floor(T % 60)).padStart(2, '0'); };
+  const logEv = txt => { LOG.unshift([simT(), txt]); if (LOG.length > 40) LOG.pop(); };
+  function mkDraft() { const t = truth(S, curP()); const d = { rhythm: S.rhythm, ectopy: S.ectopy, vf: S.vf, dur: draft ? draft.dur : 0, couple: draft ? draft.couple : true }; KEYS.forEach(k => d[k] = Math.round(S.p.to[k] * 10) / 10); d.sys = S.p.to.sys; d.dia = S.p.to.dia; return d; }
+  draft = mkDraft();
+
+  const dbg = $('root');
+  dbg.innerHTML = `
+<div class="top2"><div class="brand"><span>ϟ</span> PULSELAB</div><span class="pill" id="p-mode"><i></i><span></span></span><span class="pill" id="p-disp"><i></i><span></span></span><span class="pill" id="p-run"><i></i><span></span></span><span class="pill" id="p-t"><i></i><span></span></span><div class="sp"></div><button class="btn bas" id="basal">↺ Restaurar basal</button><button class="btn" id="run">▶ Retomar</button><button class="btn" id="pause">Ⅱ Congelar</button><button class="btn" id="restart">↻ Reiniciar traçado</button><span style="width:10px"></span><button class="btn" id="mutebtn" title="Silenciar ou ativar todo o som da projeção">🔊 Som</button><button class="btn" id="phone">📱 Celular</button><button class="btn pri" id="open">Abrir projeção ↗</button><button class="btn" id="openfs">Projeção em tela cheia</button></div>
+<div class="ro hide" id="ro"><b>Outro console assumiu o controle desta sessão.</b><span>Este está somente leitura.</span><button class="btn" id="take">Assumir controle</button></div>
+<div class="cwrap">
+<aside class="lcol">
+<section class="panel"><div class="ph">Cenários</div><div class="scl" id="scs"></div></section>
+<section class="panel"><div class="ph">Simulação</div><div class="pb"><div class="row"><span class="hint">Tempo da aula</span><span id="rates" class="row"></span></div><label class="chk" style="margin-top:10px"><input type="checkbox" id="auto"> Evolução automática das fases</label><div style="margin-top:12px" id="phbox"></div></div></section>
+</aside>
+<section class="mcol">
+<section class="panel"><div class="ph"><span>Paciente</span><span class="hint">Espaço congela · 1–9 cenários · A silencia · B bip</span></div><div class="pb" id="pg-pt"></div></section>
+<section class="panel"><div class="ph">Estado do paciente e registro da aula</div><div class="pb cols2"><div><div class="kv" id="kv"></div><div id="alarms" style="margin-top:14px"></div></div><div><div class="sgrp" style="padding:0 0 6px">Registro da sessão</div><div id="log" class="hint" style="display:flex;flex-direction:column;gap:3px"></div></div></div></section>
+</section>
+<aside class="rcol">
+<section class="panel keep"><div class="ph"><span>Projeção ao vivo</span><span class="hint" id="rev"></span></div><div class="pvw"><iframe class="prev" id="prev" title="Pré-visualização do monitor" src="?mode=projection&embed=1"></iframe></div><div class="hint" style="padding:6px 10px">Arraste um painel sobre outro para trocar de lugar. O × oculta o painel e os outros ocupam o espaço.</div></section>
+<section class="panel" style="flex:1 1 auto"><div class="tabs" id="tabs"><button class="tab on" data-tab="al">Alarmes</button><button class="tab" data-tab="sn">Som</button><button class="tab" data-tab="ds">Tela</button><button class="tab" data-tab="ss">Sessão</button></div>
+<div class="pb"><div class="page on" id="pg-al"></div><div class="page" id="pg-sn"></div><div class="page" id="pg-ds"></div><div class="page" id="pg-ss"></div></div></section></aside>
+</div></div>`;
+
+  /* ---- sessão ---- */
+  function commit(fn, quiet) {
+    if (readOnly) return false;
+    const n = JSON.parse(JSON.stringify(S)); fn(n); n.rev = S.rev + 1; n.ctrl = myId; S = sanitize(n); S.ctrl = myId;
+    saveS(S); post({ t: 'state', s: S }); if (RM && RM.conns.size) rmBroadcast({ t: 'state', s: S }); renderLight(); return true;
+  }
+  const reanchor = (n, running, rate) => { const t = now(), T = clockT(n.clock, t), P = TtoP(n.clock, T); n.clock = { running, wall0: t, rt0: T, pt0: P, rate: rate === undefined ? n.clock.rate : rate }; };
+  function setTargets(n, to, dur) { const P = TtoP(n.clock, clockT(n.clock, now())), cur = truth(n, P), from = {}; KEYS.forEach(k => from[k] = cur[k]); n.p = { from, to: Object.assign({}, to), t0: P, dur }; }
+  function applyScenario(id) {
+    const sc = SC[id]; if (!sc) return;
+    commit(n => {
+      n.rhythm = sc.rhythm; n.ectopy = sc.ectopy || 0; n.st = sc.ph[0].st || 0; n.cpr = false; n.vf = 'coarse';
+      setTargets(n, rhythmRules(sc.ph[0].v, sc.rhythm, false), Math.max(sc.ph[0].dur, 8));
+      const P = TtoP(n.clock, clockT(n.clock, now())); n.scen = { id, phase: 0, startP: P, auto: n.scen.auto !== false };
+      if (n.nibp.every > 0 && n.nibp.state !== 'meas' && !PULSELESS.has(sc.rhythm)) { const T = clockT(n.clock, now()); n.nibp.seq++; n.nibp.state = 'meas'; n.nibp.startT = T; n.nibp.nextT = T + Math.max(n.nibp.every, 45); }
+    });
+    logEv('Cenário: ' + sc.name); draft = mkDraft(); renderAll(); toast('Cenário: ' + sc.name);
+  }
+  function goPhase(i) {
+    const sc = SC[S.scen.id]; if (!sc || !sc.ph[i]) return; const ph = sc.ph[i];
+    commit(n => { if (ph.rhythm) n.rhythm = ph.rhythm; if (ph.st !== undefined) n.st = ph.st; if (ph.ectopy !== undefined) n.ectopy = ph.ectopy; setTargets(n, rhythmRules(ph.v, n.rhythm, n.cpr), ph.dur); n.scen.phase = i; if (i === 0) n.scen.startP = TtoP(n.clock, clockT(n.clock, now())); });
+    draft = mkDraft(); renderAll();
+  }
+  function startNibp() { commit(n => { const T = clockT(n.clock, now()); n.nibp.seq++; n.nibp.state = 'meas'; n.nibp.startT = T; n.nibp.nextT = T + Math.max(n.nibp.every, 45); }); }
+  function tick() {
+    if (readOnly) return; const T = curT(), P = curP(), sc = SC[S.scen.id];
+    if (S.clock.running && S.scen.auto && sc && S.scen.phase + 1 < sc.ph.length && P >= S.scen.startP + sc.ph[S.scen.phase + 1].at) goPhase(S.scen.phase + 1);
+    const N = S.nibp;
+    if (S.clock.running) {
+      if (N.state === 'meas' && T >= N.startT + NIBP_SECONDS) { commit(n => { n.nibp.state = 'idle'; n.nibp.res = nibpResult(n, TtoP(n.clock, n.nibp.startT + NIBP_SECONDS), n.nibp.seq); }); }
+      else if (N.state !== 'meas' && N.every > 0 && T >= N.nextT) startNibp();
+    }
+  }
+  setInterval(tick, 500);
+
+  /* ---- rascunho dos parâmetros ---- */
+  const pulseless = () => PULSELESS.has(draft.rhythm);
+  function lockedKeys() { const r = draft.rhythm; if (!PULSELESS.has(r)) return {}; const o = { sys: 'sem pulso: PNI e SpO₂ não são lidas', dia: 'sem pulso: PNI não é lida', spo2: 'sem pulso: sem sinal de pleth' }; if (r === 'vf' || r === 'asys' || r === 'tdp') o.hr = 'sem QRS detectável: FC "---"'; return o; }
+  function edit(key, val) {
+    const prev = Object.assign({}, draft); draft[key] = val; let notes = [];
+    if (draft.couple && KEYS.includes(key) && !PULSELESS.has(draft.rhythm)) { const r = couple(prev, draft, key); Object.assign(draft, r.next); notes = r.notes; }
+    renderParams(); if (notes.length) toast('Acoplamento fisiológico: ' + notes.join(', '));
+    if (live) { clearTimeout(dtimer); dtimer = setTimeout(applyDraft, 150); }
+  }
+  function setRhythm(r) {
+    const wasPl = PULSELESS.has(draft.rhythm); draft.rhythm = r;
+    if (PULSELESS.has(r)) { Object.assign(draft, rhythmRules(draft, r, S.cpr)); draft.dur = Math.min(draft.dur, 10); if (r === 'vtp' && !draft.hr) draft.hr = 180; if (r === 'pea' && !draft.hr) draft.hr = 52; }
+    else if (wasPl) { Object.assign(draft, { sys: 100, dia: 60, rr: 14, spo2: 94, etco2: 35 }); if (!draft.hr) draft.hr = 80; if (r === 'vt' && draft.hr < 140) draft.hr = 176; }
+    else if (r === 'vt' && draft.hr < 140) draft.hr = 176; else if (r === 'afib' && draft.hr < 90) draft.hr = 130; else if (r === 'flutter' && (draft.hr < 120 || draft.hr > 190)) draft.hr = 150; else if (r === 'svt' && draft.hr < 150) draft.hr = 188; else if (r === 'avb3' && draft.hr > 60) draft.hr = 36;
+    renderParams(); if (live) { clearTimeout(dtimer); dtimer = setTimeout(applyDraft, 150); }
+  }
+  function applyDraft() {
+    clearTimeout(dtimer); const d = draft;
+    commit(n => {
+      if (d.rhythm !== n.rhythm) n.st = 0; n.rhythm = d.rhythm; n.ectopy = d.ectopy; n.vf = d.vf;
+      const v = {}; KEYS.forEach(k => v[k] = d[k]); setTargets(n, rhythmRules(v, d.rhythm, n.cpr), d.dur);
+      n.scen = { id: 'custom', phase: 0, startP: 0, auto: false };
+    }); logEv('Ajuste manual · ritmo ' + RH[d.rhythm] + ' · FC ' + d.hr + ' · PA ' + d.sys + '/' + d.dia + ' · SpO₂ ' + d.spo2); renderAll(); toast('Aplicado na projeção');
+  }
+  function rce() { logEv('RCE: ritmo sinusal'); commit(n => { n.rhythm = 'sinus'; n.cpr = false; n.ectopy = 0; n.st = 0; setTargets(n, { hr: 88, sys: 102, dia: 62, rr: 14, spo2: 92, etco2: 42, temp: n.p.to.temp }, 12); n.scen = { id: 'custom', phase: 0, startP: 0, auto: false }; if (n.nibp.every > 0) n.nibp.nextT = clockT(n.clock, now()) + 15; }); draft = mkDraft(); renderAll(); toast('RCE: ritmo sinusal, EtCO₂ sobe'); }
+  function shock() {
+    const out = $('shock-out').value; logEv((S.rhythm === 'vt' ? 'Cardioversão' : 'Choque') + ' 200 J (' + RH[S.rhythm] + ')'); commit(n => { n.shockT = clockT(n.clock, now()); }); toast(S.rhythm === 'vt' ? 'Cardioversão aplicada' : 'Choque aplicado');
+    if (out === 'none') return;
+    setTimeout(() => { if (readOnly) return; if (out === 'rce') rce(); else { commit(n => { n.rhythm = out; n.ectopy = 0; setTargets(n, rhythmRules(Object.assign({}, n.p.to, { hr: out === 'pea' ? 52 : 0 }), out, n.cpr), 4); n.scen = { id: 'custom', phase: 0, startP: 0, auto: false }; }); draft = mkDraft(); renderAll(); } }, 2000);
+  }
+  function toggleCpr() { logEv(S.cpr ? 'RCP interrompida' : 'RCP iniciada'); commit(n => { n.cpr = !n.cpr; const v = Object.assign({}, n.p.to); setTargets(n, rhythmRules(v, n.rhythm, n.cpr), 25); }); draft = mkDraft(); renderAll(); }
+
+  /* ---- renderização ---- */
+  function rates() { $('rates').innerHTML = [1, 2, 5, 10].map(r => `<button class="btn ${S.clock.rate === r ? 'pri' : ''}" data-rate="${r}">×${r}</button>`).join(''); $('rates').querySelectorAll('[data-rate]').forEach(b => b.onclick = () => commit(n => reanchor(n, n.clock.running, Number(b.dataset.rate)))); }
+  function renderScs() {
+    const idx = id => SCENARIOS.findIndex(x => x.id === id);
+    $('scs').innerHTML = GROUPS.map(g => `<div class="sgrp">${g[0]}</div>` + g[1].map(id => { const s = SC[id], i = idx(id); return `<button class="sc ${S.scen.id === id ? 'on' : ''}" data-id="${id}"><span class="n">${i < 9 ? i + 1 : ''}</span><span><b>${s.name}</b><small>${s.sub}</small></span></button>`; }).join('')).join('');
+    $('scs').querySelectorAll('[data-id]').forEach(b => b.onclick = () => applyScenario(b.dataset.id));
+  }
+  function renderPhase() {
+    const sc = SC[S.scen.id], el = $('phbox');
+    if (!sc) { el.innerHTML = `<div class="hint">Cenário personalizado. Ajuste os parâmetros na aba Paciente.</div>`; return; }
+    const P = curP(), n = sc.ph.length, i = S.scen.phase, nx = sc.ph[i + 1];
+    let h = `<div class="row" style="justify-content:space-between"><b>${sc.name}</b><span class="hint">Fase ${i + 1} de ${n}${sc.ph[i].note ? ' · ' + sc.ph[i].note : ''}</span></div>`;
+    if (nx) { const left = Math.max(0, S.scen.startP + nx.at - P), pct = clamp(((P - (S.scen.startP + sc.ph[i].at)) / (nx.at - sc.ph[i].at)) * 100, 0, 100); h += `<div class="phb" style="margin:8px 0"><i style="width:${pct}%"></i></div><div class="row"><span class="hint">Próxima fase em ${Math.floor(left / 60)}:${String(Math.round(left % 60)).padStart(2, '0')} (tempo fisiológico)${nx.note ? ' · ' + nx.note : ''}</span><span class="sp"></span><button class="btn" id="nextph">Avançar fase ▸</button></div>`; }
+    else h += `<div class="hint" style="margin-top:6px">Última fase do cenário.</div>`;
+    h += `<details style="margin-top:10px"><summary class="hint">Fonte e justificativa</summary><div class="hint" style="margin-top:6px">${sc.fonte} Valores didáticos para adulto.</div></details>`;
+    el.innerHTML = h; const b = $('nextph'); if (b) b.onclick = () => goPhase(i + 1);
+  }
+  function buildParams() {
+    const pg = $('pg-pt');
+    pg.innerHTML = `<div class="row" style="margin-bottom:10px"><label class="chk"><input type="radio" name="lv" value="live" ${live ? 'checked' : ''}> Ao vivo</label><label class="chk"><input type="radio" name="lv" value="prep" ${live ? '' : 'checked'}> Preparar</label><span class="hint" style="margin-left:4px">Ritmo</span><select id="f-rhythm" aria-label="Ritmo">${Object.keys(RH).map(k => `<option value="${k}">${RH[k]}</option>`).join('')}</select><span class="hint">Alcançar em</span><select id="f-dur" aria-label="Alcançar em">${DURS.map(d => `<option value="${d[0]}">${d[1]}</option>`).join('')}</select><span class="sp"></span><button class="btn pri" id="apply">Aplicar na projeção</button></div>
+<div class="qgrid">${PAR.map(p => `<div class="qc" id="fw-${p[0]}"><div class="ql"><span>${p[6]}</span><small>${p[2]}</small></div><div class="qv"><button class="stp" data-k="${p[0]}" data-d="-1" aria-label="Diminuir ${p[1]}">−</button><input type="number" id="f-${p[0]}" min="${p[3]}" max="${p[4]}" step="${p[5]}" aria-label="${p[1]}"><button class="stp" data-k="${p[0]}" data-d="1" aria-label="Aumentar ${p[1]}">+</button></div><input type="range" id="r-${p[0]}" min="${p[3]}" max="${p[4]}" step="${p[5]}" aria-label="${p[1]} (deslizante)"><div class="why" id="w-${p[0]}"></div></div>`).join('')}</div>
+<div class="row" style="margin-top:12px"><label class="chk"><input type="checkbox" id="f-couple"> Acoplar parâmetros</label><span class="hint" id="cplnote"></span><span class="sp"></span><span class="hint">Extrassístoles</span><input type="range" id="f-ect" min="0" max="30" step="1" style="width:110px;accent-color:var(--acc)" aria-label="Extrassístoles por minuto"><span class="hint" id="o-ect" style="min-width:48px"></span><span class="hint">FV</span><select id="f-vf" aria-label="Tipo de FV"><option value="coarse">Grossa</option><option value="fine">Fina</option></select></div>
+<div class="row" style="margin-top:12px" id="arrest"><b style="font-size:13px">Parada:</b><button class="btn" id="cpr"></button><button class="btn pri" id="rce">RCE (retorno da circulação)</button><button class="btn" id="losepulse">Perder pulso (TV → sem pulso)</button><span class="sp"></span><span class="hint">Após o choque</span><select id="shock-out" aria-label="Resultado do choque"><option value="none">Mantém o ritmo</option><option value="asys">Assistolia</option><option value="pea">AESP</option><option value="rce">RCE (sinusal)</option></select><button class="btn dan" id="shock">⚡ Choque 200 J</button></div>
+<div class="row" style="margin-top:12px"><b style="font-size:13px">PNI:</b><select id="nibpmode" aria-label="Modo da PNI"><option value="0">Manual</option>${[1, 2, 3, 5, 10, 15, 30, 60].map(m => `<option value="${m * 60}">Automático a cada ${m} min</option>`).join('')}</select><button class="btn" id="nibpnow">Medir agora</button></div>`;
+    pg.querySelectorAll('input[name=lv]').forEach(r => r.onchange = () => { live = r.value === 'live'; renderParams(); });
+    $('apply').onclick = applyDraft;
+    $('f-rhythm').onchange = e => setRhythm(e.target.value); $('f-dur').onchange = e => { draft.dur = Number(e.target.value); };
+    PAR.forEach(p => { const k = p[0], num = $('f-' + k), rg = $('r-' + k); const h = v => edit(k, Math.round(clamp(Number(v), p[3], p[4]) * 10) / 10); rg.oninput = () => h(rg.value); num.onchange = () => h(num.value); });
+    pg.querySelectorAll('.stp').forEach(b => b.onclick = e => { const k = b.dataset.k, p = PAR.find(x => x[0] === k), st = p[5] * (e.shiftKey ? 10 : 1); edit(k, Math.round(clamp(draft[k] + Number(b.dataset.d) * st, p[3], p[4]) * 10) / 10); });
+    $('f-ect').oninput = e => { draft.ectopy = Number(e.target.value); renderParams(); if (live) { clearTimeout(dtimer); dtimer = setTimeout(applyDraft, 150); } };
+    $('f-vf').onchange = e => { draft.vf = e.target.value; if (live) applyDraft(); };
+    $('f-couple').onchange = e => { draft.couple = e.target.checked; renderParams(); };
+    $('shock').onclick = shock; $('cpr').onclick = toggleCpr; $('rce').onclick = rce; $('losepulse').onclick = () => { draft.rhythm = 'vt'; setRhythm('vtp'); };
+    $('nibpmode').onchange = e => commit(n => { n.nibp.every = Number(e.target.value); n.nibp.nextT = clockT(n.clock, now()) + 10; }); $('nibpnow').onclick = startNibp;
+  }
+  function renderParams() {
+    if (!$('f-rhythm')) return; const lk = lockedKeys(), act = document.activeElement;
+    $('f-rhythm').value = draft.rhythm; $('f-dur').value = String(draft.dur); $('f-vf').value = draft.vf; $('f-couple').checked = draft.couple;
+    PAR.forEach(p => { const k = p[0], v = draft[k], locked = lk[k] !== undefined; const num = $('f-' + k), rg = $('r-' + k);
+      if (act !== num) num.value = v; if (act !== rg) rg.value = v; num.disabled = rg.disabled = locked; $('fw-' + k).classList.toggle('lock', locked); $('w-' + k).textContent = locked ? lk[k] : ''; });
+    $('o-ect').textContent = draft.ectopy + '/min'; $('f-ect').value = draft.ectopy; $('f-ect').disabled = PULSELESS.has(draft.rhythm) && draft.rhythm !== 'pea'; $('f-vf').disabled = draft.rhythm !== 'vf';
+    document.querySelectorAll('.stp').forEach(b => b.disabled = $('f-' + b.dataset.k).disabled);
+    $('apply').classList.toggle('hide', live);
+    $('cplnote').textContent = draft.couple ? 'SpO₂, PAS, temp. e FR arrastam os relacionados' : 'cada parâmetro muda sozinho';
+    $('arrest').classList.toggle('hide', !(PULSELESS.has(S.rhythm) || S.rhythm === 'vt')); $('shock').classList.toggle('hide', !['vf', 'vtp', 'vt', 'tdp'].includes(S.rhythm)); $('shock-out').classList.toggle('hide', !['vf', 'vtp', 'vt', 'tdp'].includes(S.rhythm)); $('cpr').textContent = S.cpr ? 'Parar RCP' : 'Iniciar RCP (100–120/min)';
+    $('cpr').classList.toggle('hide', !PULSELESS.has(S.rhythm)); $('rce').classList.toggle('hide', !PULSELESS.has(S.rhythm)); $('losepulse').classList.toggle('hide', S.rhythm !== 'vt');
+    $('nibpmode').value = String(S.nibp.every);
+  }
+  const LIMF = [['hrLo', 'FC mínima', 'bpm'], ['hrHi', 'FC máxima', 'bpm'], ['spo2Lo', 'SpO₂ mínima', '%'], ['sysLo', 'PAS mínima', 'mmHg'], ['sysHi', 'PAS máxima', 'mmHg'], ['mapLo', 'PAM mínima', 'mmHg'], ['rrLo', 'FR mínima', 'irpm'], ['rrHi', 'FR máxima', 'irpm'], ['etLo', 'EtCO₂ mínimo', 'mmHg'], ['etHi', 'EtCO₂ máximo', 'mmHg'], ['tLo', 'Temp. mínima', '°C'], ['tHi', 'Temp. máxima', '°C']];
+  function buildAlarms() {
+    $('pg-al').innerHTML = `<div class="row" style="margin-bottom:12px"><label class="chk"><input type="checkbox" id="a-on"> Alarmes ligados</label><span class="hint">Som e silenciar: aba Som</span></div>
+<div class="fgrid">${LIMF.map(l => `<div class="f"><label for="l-${l[0]}">${l[1]} <span class="hint">${l[2]}</span></label><input type="number" id="l-${l[0]}" step="${l[0].startsWith('t') ? 0.1 : 1}"></div>`).join('')}<div class="f"><label for="l-apn">Apneia após <span class="hint">s</span></label><input type="number" id="l-apn" min="10" max="40"></div></div>
+<div class="row" style="margin-top:12px"><button class="btn" id="a-def">Restaurar limites didáticos</button></div>
+<p class="hint" style="margin-top:10px">Padrões didáticos de adulto, editáveis. Prioridades inspiradas na IEC 60601-1-8: alta (vermelho), média (amarelo), baixa (ciano). Assistolia, FV, TV, FC extrema, apneia e SpO₂ &lt; 85% são de alta prioridade.</p>`;
+    $('a-on').onchange = e => commit(n => n.alarm.on = e.target.checked);
+    LIMF.forEach(l => $('l-' + l[0]).onchange = e => commit(n => n.alarm.limits[l[0]] = Number(e.target.value))); $('l-apn').onchange = e => commit(n => n.alarm.apneaSec = clamp(Number(e.target.value), 10, 40));
+    $('a-def').onclick = () => commit(n => { n.alarm.limits = Object.assign({}, LIMITS); n.alarm.apneaSec = 20; }); renderAlarmsForm();
+  }
+  function renderAlarmsForm() { if (!$('a-on')) return; $('a-on').checked = S.alarm.on; const L = Object.assign({}, LIMITS, S.alarm.limits); LIMF.forEach(l => { const el = $('l-' + l[0]); if (document.activeElement !== el) el.value = L[l[0]]; }); if (document.activeElement !== $('l-apn')) $('l-apn').value = S.alarm.apneaSec; }
+  function buildSound() {
+    $('pg-sn').innerHTML = `<div class="hint" id="snd-st" style="margin-bottom:12px"></div>
+<div class="f" style="margin-bottom:10px"><label class="chk" style="margin:0"><input type="checkbox" id="s-alm"> Alarmes sonoros (automáticos)</label></div>
+<div class="f" style="margin-bottom:14px"><label for="s-vol">Volume dos alarmes <output id="o-vol"></output></label><input type="range" id="s-vol" min="0" max="100" step="5"></div>
+<div class="f" style="margin-bottom:10px"><label class="chk" style="margin:0"><input type="checkbox" id="s-beep"> Bip de batimento (FC)</label></div>
+<div class="f" style="margin-bottom:10px"><label for="s-src">Fonte do bip</label><select id="s-src"><option value="ecg">QRS do ECG (tom fixo)</option><option value="spo2">Pulso da SpO₂ (tom varia com a saturação)</option></select></div>
+<div class="f" style="margin-bottom:14px"><label for="s-bvol">Volume do bip <output id="o-bvol"></output></label><input type="range" id="s-bvol" min="0" max="100" step="5"></div>
+<div class="row"><button class="btn" id="t-alm">Testar alarme alto</button><button class="btn" id="t-alm2">Testar alarme médio</button><button class="btn" id="t-beep">Testar bip</button></div>
+<div class="row" style="margin-top:14px"><button class="btn" id="a-sil">Silenciar alarmes 2 min</button><button class="btn" id="a-unsil">Reativar som</button></div>
+<p class="hint" style="margin-top:12px">O navegador libera áudio só depois de um clique. Ao abrir a projeção aparece uma tela «Toque para iniciar»: um clique nela e o som funciona sozinho. Mudar parâmetros, cenário ou ritmo nunca desliga o som. O bip não toca em FV, assistolia nem eletrodo solto (não há QRS).</p>`;
+    $('s-alm').onchange = e => commit(n => n.alarm.sound = e.target.checked);
+    $('s-vol').oninput = e => commit(n => n.audio.vol = Number(e.target.value)); $('s-bvol').oninput = e => commit(n => n.audio.beepVol = Number(e.target.value));
+    $('s-beep').onchange = e => commit(n => n.audio.beep = e.target.checked); $('s-src').onchange = e => commit(n => n.audio.beepSrc = e.target.value);
+    $('t-alm').onclick = () => post({ t: 'test', what: '3' }); $('t-alm2').onclick = () => post({ t: 'test', what: '2' }); $('t-beep').onclick = () => post({ t: 'test', what: 'beep' });
+    $('a-sil').onclick = () => commit(n => n.alarm.silencedUntil = now() + 120000); $('a-unsil').onclick = () => commit(n => n.alarm.silencedUntil = 0); renderSoundForm();
+  }
+  function renderSoundForm() { if (!$('s-alm')) return; const A = S.audio, a = document.activeElement; $('s-alm').checked = S.alarm.sound; $('s-beep').checked = A.beep; if (a !== $('s-src')) $('s-src').value = A.beepSrc; if (a !== $('s-vol')) $('s-vol').value = A.vol; if (a !== $('s-bvol')) $('s-bvol').value = A.beepVol; $('o-vol').textContent = A.vol + '%'; $('o-bvol').textContent = A.beepVol + '%'; }
+  const LAYN = [['ecg', 'ECG'], ['pleth', 'Pleth'], ['resp', 'Respiração'], ['capno', 'CO₂'], ['hr', 'FC'], ['spo2', 'SpO₂'], ['nibp', 'PNI'], ['etco2', 'EtCO₂'], ['rr', 'FR'], ['temp', 'Temperatura']];
+  const sel = (id, label, opts) => `<div class="f"><label for="${id}">${label}</label><select id="${id}">${opts.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('')}</select></div>`;
+  function buildDisplay() {
+    $('pg-ds').innerHTML = `<div class="fgrid">
+${sel('d-speed', 'Velocidade ECG e pleth', [[6.25, '6,25 mm/s'], [12.5, '12,5 mm/s'], [25, '25 mm/s (padrão)'], [50, '50 mm/s']])}
+${sel('d-speed2', 'Velocidade respiração e CO₂', [[6.25, '6,25 mm/s (padrão)'], [12.5, '12,5 mm/s'], [25, '25 mm/s']])}
+${sel('d-gain', 'Ganho do ECG', [[0.5, '5 mm/mV'], [1, '10 mm/mV (padrão)'], [2, '20 mm/mV'], [4, '40 mm/mV']])}
+${sel('d-cap', 'Escala do CO₂', [[50, '0–50 mmHg'], [100, '0–100 mmHg']])}
+${sel('d-color', 'Cor do ECG', [['green', 'Verde (padrão)'], ['amber', 'Âmbar'], ['white', 'Branco']])}
+${sel('d-grid', 'Grade do ECG (1 mm / 5 mm)', [['1', 'Ligada'], ['0', 'Desligada']])}
+
+<div class="f"><label for="d-bed">Leito</label><input type="text" id="d-bed" maxlength="24"></div><div class="f"><label for="d-name">Paciente (fictício)</label><input type="text" id="d-name" maxlength="32"></div></div>
+<div style="margin-top:16px"><div class="sgrp" style="padding:0 0 6px">Painéis visíveis na projeção</div><div class="row" id="vis">${LAYN.map(l => `<label class="chk" style="width:110px"><input type="checkbox" data-vis="${l[0]}"> ${l[1]}</label>`).join('')}</div><div class="row" style="margin-top:10px"><button class="btn" id="lay-reset">Restaurar painéis e ordem</button></div><p class="hint" style="margin-top:8px">Também dá para arrastar e ocultar direto na miniatura da projeção.</p></div>
+<p class="hint" style="margin-top:12px">Calibração: 1 mm = 0,04 s a 25 mm/s e 10 mm/mV; a escala aparece no rótulo do ECG.</p>`;
+    $('vis').querySelectorAll('[data-vis]').forEach(c => c.onchange = () => commit(n => { const id = c.dataset.vis, h = n.layout.hidden; const i = h.indexOf(id); if (c.checked && i >= 0) h.splice(i, 1); else if (!c.checked && i < 0) h.push(id); }));
+    $('lay-reset').onclick = () => commit(n => { n.layout = JSON.parse(JSON.stringify(ENGINE.DEFAULT_LAYOUT)); }); 
+    const set = (id, k, cast) => $(id).onchange = e => commit(n => { n.display[k] = cast(e.target.value); });
+    set('d-speed', 'speed', Number); set('d-speed2', 'speed2', Number); set('d-gain', 'gain', Number); set('d-cap', 'capScale', Number); set('d-color', 'ecgcolor', String);
+    set('d-grid', 'grid', v => v === '1'); 
+    $('d-bed').onchange = e => commit(n => n.display.bed = e.target.value.slice(0, 24)); $('d-name').onchange = e => commit(n => n.display.name = e.target.value.slice(0, 32)); renderDisplayForm();
+  }
+  function renderDisplayForm() { if (!$('d-speed')) return; const D = S.display, b = v => v ? '1' : '0'; $('d-speed').value = D.speed; $('d-speed2').value = D.speed2; $('d-gain').value = D.gain; $('d-cap').value = D.capScale; $('d-color').value = D.ecgcolor; $('d-grid').value = b(D.grid); document.querySelectorAll('[data-vis]').forEach(c => c.checked = !S.layout.hidden.includes(c.dataset.vis)); if (document.activeElement !== $('d-bed')) $('d-bed').value = D.bed; if (document.activeElement !== $('d-name')) $('d-name').value = D.name; }
+  function buildSession() {
+    $('pg-ss').innerHTML = `<div class="row"><button class="btn" id="exp">Exportar sessão (JSON)</button><label class="btn" for="imp" style="cursor:pointer">Importar JSON</label><input type="file" id="imp" accept="application/json,.json" class="hide"><button class="btn dan" id="rst">Apagar sessão salva e recomeçar</button></div>
+<div class="kv" style="margin-top:16px"><span>Versão (build)</span><b>${BUILD.startsWith('__') ? 'dev' : BUILD.slice(0, 7)}</b><span>Esquema</span><b>v2</b><span>Armazenamento</span><b>${LS}</b></div>
+<p class="hint" style="margin-top:12px">Atalhos no console: <b>Espaço</b> congela/retoma · <b>1–9</b> carregam cenários · <b>A</b> silencia o alarme por 2 min · <b>B</b> liga/desliga o bip. Na projeção: <b>F</b> tela cheia.<br>Console e projeção sincronizam no mesmo navegador (BroadcastChannel + localStorage). Entre aparelhos diferentes, não.</p>`;
+    $('exp').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' })); a.download = 'pulselab-sessao.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+    $('imp').onchange = e => { const f = e.target.files[0]; if (!f) return; f.text().then(t => { try { const o = JSON.parse(t); if (o.schema !== 2 && o.hr === undefined) throw 0; const n = sanitize(o); commit(m => { Object.assign(m, n); m.clock.wall0 = now(); }); draft = mkDraft(); renderAll(); toast('Sessão importada'); } catch (err) { toast('Arquivo inválido: nada foi alterado'); } }); e.target.value = ''; };
+    $('rst').onclick = () => { if (!$('rst').dataset.s) { $('rst').dataset.s = 1; $('rst').textContent = 'Clique de novo para confirmar'; setTimeout(() => { $('rst').dataset.s = ''; $('rst').textContent = 'Apagar sessão salva e recomeçar'; }, 3500); return; } try { localStorage.removeItem(LS); } catch (e) {} const d = defaultSession(); commit(n => { Object.assign(n, d); n.rev = S.rev + 1; n.epoch = S.epoch + 1; }); draft = mkDraft(); renderAll(); toast('Sessão recomeçada'); };
+  }
+  function renderLight() {
+    const run = S.clock.running; const pr = $('p-run'); pr.className = 'pill ' + (run ? 'ok' : 'warn'); pr.lastChild.textContent = run ? 'Em curso ×' + S.clock.rate : 'Congelado';
+    $('run').disabled = run; $('pause').disabled = !run; $('auto').checked = S.scen.auto; $('rev').textContent = 'rev ' + S.rev;
+    const pm = $('p-mode'); pm.className = 'pill ' + (readOnly ? 'bad' : (live ? 'ok' : 'warn')); pm.lastChild.textContent = readOnly ? 'Somente leitura' : (live ? 'Ao vivo' : 'Preparando (rascunho)');
+    $('mutebtn').textContent = S.audio.mute ? '🔇 Mudo' : '🔊 Som'; $('mutebtn').classList.toggle('dan', !!S.audio.mute); rates(); renderScs(); renderPhase(); renderAlarmsForm(); renderSoundForm(); renderDisplayForm(); renderParams();
+  }
+  function renderAll() { renderLight(); }
+  buildParams(); buildAlarms(); buildSound(); buildDisplay(); buildSession(); renderAll();
+
+  /* ---- ações da sessão ---- */
+  $('run').onclick = () => commit(n => reanchor(n, true)); $('pause').onclick = () => commit(n => reanchor(n, false));
+  $('restart').onclick = () => commit(n => { reanchor(n, n.clock.running); n.epoch++; n.epochT = clockT(n.clock, now()); n.seed = (n.seed * 1664525 + 1013904223) >>> 0 || 1; toast('Traçado reiniciado'); });
+  $('basal').onclick = () => applyScenario('basal'); $('auto').onchange = e => commit(n => n.scen.auto = e.target.checked);
+  $('open').onclick = () => window.open(projUrl(), 'pulselab_projection'); $('openfs').onclick = () => window.open(projUrl() + '&fullscreen=1', 'pulselab_projection');
+  function projUrl() { const u = new URL(location.href); u.search = ''; u.searchParams.set('mode', 'projection'); return u.href; }
+  $('tabs').querySelectorAll('.tab').forEach(b => b.onclick = () => { tab = b.dataset.tab; $('tabs').querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('.page').forEach(p => p.classList.toggle('on', p.id === 'pg-' + tab)); });
+  window.addEventListener('keydown', e => {
+    if (/INPUT|SELECT|TEXTAREA/.test((e.target || {}).tagName || '') && e.key !== 'Escape') return;
+    if (e.key === ' ') { e.preventDefault(); commit(n => reanchor(n, !n.clock.running)); }
+    else if (/^[1-9]$/.test(e.key)) applyScenario(SCENARIOS[Number(e.key) - 1].id);
+    else if (e.key === 'a' || e.key === 'A') commit(n => n.alarm.silencedUntil = now() + 120000);
+    else if (e.key === 'b' || e.key === 'B') { commit(n => n.audio.beep = !n.audio.beep); toast(S.audio.beep ? 'Bip de FC ligado' : 'Bip de FC desligado'); }
+  });
+
+  /* ---- transporte ---- */
+  const claim = () => { readOnly = false; document.body.classList.remove('readonly'); $('ro').classList.add('hide'); post({ t: 'claim', ts: now() }); renderAll(); };
+  $('take').onclick = () => { S = loadS(); draft = mkDraft(); claim(); };
+  if (bc) bc.onmessage = e => {
+    const m = e.data || {};
+    if (m.t === 'hello') { if (!readOnly) post({ t: 'state', s: S }); }
+    else if (m.t === 'layout' && !readOnly) { commit(n => { const L = n.layout; if (m.op === 'hide') { if (!L.hidden.includes(m.pid)) L.hidden.push(m.pid); } else if (m.op === 'swap' && L[m.group]) { const a = L[m.group], i = a.indexOf(m.pid), j = a.indexOf(m.before); if (i >= 0 && j >= 0) { a[i] = m.before; a[j] = m.pid; } } }); }
+    else if (m.t === 'hb') { displays.set(m.id, { t: now(), embed: m.embed, audio: m.audio, alarms: m.alarms || [], m: m.m }); }
+    else if (m.t === 'claim' && m.id !== myId) { readOnly = true; document.body.classList.add('readonly'); $('ro').classList.remove('hide'); renderAll(); }
+    else if (m.t === 'state' && m.id !== myId && readOnly && m.s) { S = sanitize(m.s); draft = mkDraft(); renderAll(); }
+  };
+  claim();
+/*HOST_JS*/
+  setInterval(() => { if (!readOnly) post({ t: 'chb', rev: S.rev }); }, 2000);
+  /* ---- painel de estado ---- */
+  function status() {
+    const t = now(); for (const [k, v] of displays) if (t - v.t > 6000) displays.delete(k);
+    const proj = [...displays.values()].filter(d => !d.embed), pd = $('p-disp'); pd.className = 'pill ' + (proj.length ? 'ok' : 'warn'); pd.lastChild.textContent = proj.length ? 'Projeção conectada' + (proj.length > 1 ? ' (' + proj.length + ')' : '') : 'Projeção desconectada';
+    const tr = truth(S, curP()), m = (proj[0] || [...displays.values()][0] || {}).m || {};
+    $('p-t').lastChild.textContent = 'Simulação ' + simT();
+    const f = v => v === null || v === undefined ? '---' : v;
+    $('kv').innerHTML = `<span>Ritmo</span><b>${RH[S.rhythm]}${S.cpr ? ' + RCP' : ''}</b><span>FC (alvo)</span><b>${Math.round(tr.hr)} bpm</b><span>PA (alvo)</span><b>${Math.round(tr.sys)}/${Math.round(tr.dia)} (PAM ${Math.round(tr.map)})</b><span>SpO₂ (alvo)</span><b>${Math.round(tr.spo2)} %</b><span>FR / EtCO₂ (alvo)</span><b>${Math.round(tr.rr)} / ${Math.round(tr.etco2)}</b><span>Temp</span><b>${temp1(tr.temp)} °C</b><span>Monitor mede</span><b>${f(m.hr)} · ${f(m.pr)} · ${f(m.spo2)} · ${f(m.rr)} · ${f(m.etco2)}</b>`;
+    const al = [].concat(...[...displays.values()].filter(d => !d.embed).map(d => d.alarms)).concat(proj.length ? [] : ([...displays.values()][0] || { alarms: [] }).alarms);
+    const seen = new Set(), list = al.filter(a => !seen.has(a.text) && seen.add(a.text)).sort((a, b) => b.prio - a.prio);
+    const cur = new Set(list.map(a => a.text)); for (const t of cur) if (!seenAl.has(t)) logEv('Alarme: ' + t); seenAl.clear(); cur.forEach(t => seenAl.add(t));
+    $('log').innerHTML = LOG.length ? LOG.slice(0, 14).map(l => `<div><b style="color:var(--fg);font-variant-numeric:tabular-nums">${l[0]}</b> &nbsp;${l[1]}</div>`).join('') : 'Nenhum evento ainda.';
+    $('alarms').innerHTML = list.length ? '<div class="alist">' + list.map(a => `<div class="al p${a.prio}">${a.text}</div>`).join('') + '</div>' : '<div class="hint">Sem alarmes ativos.</div>';
+    if (S.scen.id !== 'custom') renderPhase();
+    const ss = $('snd-st'); if (ss) { ss.textContent = proj.length ? (proj.some(d => d.audio === 'ok') ? 'Projeção conectada: som liberado.' : 'Projeção conectada: aguardando o clique inicial na tela da projeção.') : 'Projeção fechada. Abra a projeção e clique nela uma vez para liberar o som.'; ss.style.color = proj.some(d => d.audio === 'ok') ? 'var(--acc)' : 'var(--amb)'; }
+  }
+  setInterval(status, 500); status();
+  window.addEventListener('storage', e => { if (e.key === LS && e.newValue && readOnly) { try { S = sanitize(JSON.parse(e.newValue)); draft = mkDraft(); renderAll(); } catch (err) {} } });
+  window.__pl = { get S() { return S; }, get RM() { return RM; }, ids: SCENARIOS.map(x => x.id), commit, applyScenario };
+}
+
+if (MODE === 'display') startDisplay(); else if (MODE === 'remote') startRemote(); else startConsole();
+})();
+</script>
+</body>
+</html>

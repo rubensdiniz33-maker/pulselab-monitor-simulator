@@ -1,0 +1,21 @@
+{
+  "name": "pulselab-monitor-simulator",
+  "version": "5.0.0",
+  "private": true,
+  "description": "Simulador multiparamétrico de UTI para ensino (educacional)",
+  "scripts": {
+    "build": "node build.js",
+    "test": "node --test tests/engine.test.js",
+    "e2e": "node e2e.js",
+    "e2e:remote": "node remote-e2e.js",
+    "serve": "npx --yes http-server -p 8080 -c-1 ."
+  },
+  "devDependencies": {
+    "playwright-core": "^1.48.0"
+  },
+  "dependencies": {
+    "peer": "^1.0.2",
+    "peerjs": "^1.5.4",
+    "qrcode-generator": "^1.4.4"
+  }
+}
