@@ -56,7 +56,7 @@ body.embed .gate,body.embed .sndst{display:none}
 /* ---------- console do professor ---------- */
 body.console{overflow:auto;min-width:1000px}
 .top2{position:sticky;top:0;z-index:5;height:50px;display:flex;align-items:center;gap:8px;padding:0 14px;background:#0a110e;border-bottom:1px solid var(--line)}
-.top2 .btn{white-space:nowrap}.top2 .brand{white-space:nowrap}@media(max-width:1560px){#openfs,#p-t{display:none}}@media(max-width:1280px){#restart,#p-disp{display:none}}
+.top2 .btn{white-space:nowrap}.top2 .brand{white-space:nowrap}
 .brand{font-weight:900;letter-spacing:.18em;font-size:13px;margin-right:6px}.brand span{color:var(--acc)}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border:1px solid var(--line);border-radius:4px;font-size:12px;color:var(--mut);background:var(--panel);white-space:nowrap}
 .pill i{width:8px;height:8px;border-radius:50%;background:#5b6f64;display:inline-block}.pill.ok i{background:var(--acc);box-shadow:0 0 6px var(--acc)}.pill.warn i{background:var(--amb)}.pill.bad i{background:var(--red)}
@@ -219,11 +219,27 @@ body.console .pinbig{background:linear-gradient(90deg,#9bffcb,#6dd8ff);-webkit-b
 body.console .qrbox{border-radius:16px;box-shadow:0 0 0 6px #ffffff10,0 20px 40px -14px #000}
 body.console .phdev .row{border-radius:10px}
 
-@media(max-width:1560px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}#openfs,#p-t{display:none}}
-@media(max-width:1400px){body.console .cwrap{grid-template-columns:262px minmax(0,1fr) 400px}#restart .lb{display:none}#restart{padding:8px 10px}.brand small{display:none}}
-@media(max-width:1280px){#p-disp{display:none}}
+@media(max-width:1560px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:1400px){body.console .cwrap{grid-template-columns:262px minmax(0,1fr) 400px}}
 @media(max-width:1250px){body.console .cwrap{grid-template-columns:1fr;height:auto}.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){body.console *,body.console *::before,body.console *::after{animation:none!important;transition:none!important}}
+
+/* ===== v7: barra superior que sempre cabe na tela ===== */
+body.console{min-width:0}
+body.console .top2{overflow:hidden}
+.top2 .brand{flex:none}.top2 .pills{display:flex;gap:8px;flex:1 1 0;min-width:0;overflow:hidden;mask-image:linear-gradient(90deg,#000 88%,transparent)}
+.top2 .acts{display:flex;align-items:center;gap:6px;flex:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+body.console .btn.ghost{background:transparent;border-color:transparent;box-shadow:none;padding:8px 10px;color:#c3d6cb;position:relative}
+body.console .btn.ghost:hover:not([disabled]){background:#ffffff0f;border-color:#ffffff1c;box-shadow:none;transform:none;color:#fff}
+body.console .btn.ghost.muted{color:#ff8b94;background:#3a1519}
+.seg{display:inline-flex;border:1px solid var(--bd);border-radius:11px;background:#ffffff06;padding:2px;gap:2px}
+.seg .btn.ghost{padding:7px 11px;border-radius:9px}.seg .btn.ghost[disabled]{opacity:1;color:var(--acc);background:#4dff9a1c;box-shadow:inset 0 0 0 1px #4dff9a55}
+.vsep{width:1px;height:24px;background:var(--bd);margin:0 4px}
+#phone .cnt{position:absolute;top:1px;right:1px;min-width:17px;height:17px;border-radius:9px;background:var(--acc);color:#03170d;font-size:10.5px;font-weight:800;display:grid;place-items:center;padding:0 4px;animation:pop .25s both}
+@media(max-width:1500px){.top2 .brand small{display:none}#p-t{display:none}}
+@media(max-width:1280px){#basal .lb{display:none}#basal{padding:8px 10px}.top2 .brand b{display:none}}
+@media(max-width:1000px){#p-disp,#p-run{display:none}.top2{padding:0 10px}}
 
 /* ---- modal "Celular" (console) ---- */
 .modal{position:fixed;inset:0;background:#000b;z-index:40;display:flex;align-items:center;justify-content:center;padding:16px}.modal.hide{display:none}
@@ -345,6 +361,7 @@ function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; le
 function gauss(r) { let u = 0; while (!u) u = r(); const v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 const g = (x, c, s, a) => a * Math.exp(-((x - c) * (x - c)) / (2 * s * s));
 
+const HR_DRIFT = new Set(['sinus', 'afib', 'flutter', 'svt', 'avb3', 'pea']);
 const PULSELESS = new Set(['vtp', 'vf', 'asys', 'pea', 'tdp']);
 const KEYS = ['hr', 'sys', 'dia', 'rr', 'spo2', 'etco2', 'temp'];
 const RHYTHMS = ['sinus', 'afib', 'flutter', 'svt', 'avb3', 'vt', 'tdp', 'vtp', 'vf', 'asys', 'pea', 'leadoff'];
@@ -376,6 +393,7 @@ function truth(S, P) {
 class Gen {
   constructor(truthAt, seed, t0) { this.truthAt = truthAt; this.reset(seed || 1, t0 || 0); }
   reset(seed, t0) {
+    const dr = mulberry32((seed ^ 0x9e3779b9) >>> 0); this.dph = [dr() * 6.2832, dr() * 6.2832, dr() * 6.2832];
     this.rng = mulberry32(seed); this.n0 = Math.floor(t0 * FS); this.n = this.n0;
     this.ecg = new Float32Array(RING); this.pl = new Float32Array(RING); this.rs = new Float32Array(RING); this.co = new Float32Array(RING);
     this.beats = []; this.pulses = []; this.next = t0 + 0.35; this.nextType = 'N'; this.afterV = 0; this.lastR = t0;
@@ -383,13 +401,15 @@ class Gen {
     this.br = null; this.bph = 0; this.bvar = 1; this.prevE = 0; this.peak = 0; this.rcls = '';
     this.vfph = [0, 0, 0]; this.fib = [0, 0, 0]; this.lastE = 0; this.shockAt = null;
   }
+  /* oscilação lenta e natural da FC (±2–3 bpm): soma de três ondas lentas com fases próprias da sessão */
+  hrDrift(t, hr) { const p = this.dph, A = hr > 170 ? 1.6 : 2.6, w = 2 * Math.PI * t; return A * (0.55 * Math.sin(w / 19 + p[0]) + 0.3 * Math.sin(w / 43 + p[1]) + 0.15 * Math.sin(w / 11 + p[2])); }
   advanceTo(T) { const N = Math.floor(T * FS); while (this.n < N) this.step(); }
   breathSin(t) { return this.br ? Math.sin(2 * Math.PI * this.bph) : 0; }
   sched(t, tr) {
     const cls = tr.rhythm === 'leadoff' ? 'sinus' : tr.rhythm;
     if (cls !== this.rcls) { this.rcls = cls; this.beats = []; this.pulses = []; this.nextType = 'N'; this.next = Math.max(t + 0.25, Math.min(this.next, t + 0.9)); }
     if (!['sinus', 'afib', 'flutter', 'svt', 'avb3', 'vt', 'vtp', 'pea'].includes(cls)) return;
-    const hr = clamp(tr.hr || 60, 20, 300), vis = tr.rhythm !== 'leadoff';
+    const hr0 = clamp(tr.hr || 60, 20, 300), hr = (tr.var && HR_DRIFT.has(cls)) ? clamp(hr0 + this.hrDrift(t, hr0), 20, 300) : hr0, vis = tr.rhythm !== 'leadoff';
     while (this.next <= t + 0.45) {
       const tR = this.next; let rr = 60 / hr, type = this.nextType, pf = 1, mean = rr;
       if (cls === 'sinus' || cls === 'pea') {
@@ -1218,8 +1238,11 @@ function startDisplay() {
      O estado do áudio é local desta página e nunca é alterado pela sincronização de parâmetros. */
   let actx = null, nextSnd = 0, lastTop = 0, busyUntil = 0, lastBeepT = clockT(S.clock, now()), unlocked = false;
   const wantFs = qs.get('fullscreen') === '1';
+  /* tom de 20 Hz praticamente mudo: mantém a aba marcada como «tocando áudio», o que a protege de suspensão em segundo plano */
+  let keepNode = null;
+  function keepAlive() { if (keepNode) return; try { const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = 20; g.gain.value = 0.003; o.connect(g); g.connect(actx.destination); o.start(); keepNode = o; } catch (e) {} }
   function setUnlocked(v) {
-    unlocked = v; $('gate').classList.toggle('hide', v || EMBED);
+    unlocked = v; $('gate').classList.toggle('hide', v || EMBED); if (v && actx && !EMBED) keepAlive();
     const st = $('sndst'); st.textContent = EMBED ? '' : (v ? 'SOM ATIVO' : 'SOM DESLIGADO · CLIQUE NA TELA'); st.classList.toggle('off', !v);
   }
   function initAudio() {
@@ -1340,13 +1363,22 @@ function startDisplay() {
     if (!top) nextSnd = 0;
     if (now() - lastHb > 1000) { lastHb = now(); post({ t: 'hb', embed: EMBED, audio: EMBED ? 'none' : (unlocked ? 'ok' : 'wait'), alarms: al.map(a => ({ text: a.text, prio: a.prio })), T, m }); }
   }
-  function frame() {
+  /* tick = tudo o que NÃO é desenho (ondas, bip, alarmes, bomba, sinal de vida). Roda por um Worker, que o navegador
+     não reduz quando a janela está em segundo plano — por isso o som continua mesmo com outra aba/janela na frente. */
+  function tick() {
     const T = clockT(S.clock, now());
-    core.advance(T);
-    for (const c of CHD) drawChan(c, core.gen);
-    beeps(T); cuffFrame(T);
-    const q = core.gen.ev.qrs, dot = $('dot'); let on = false; for (let i = q.length - 1; i >= 0 && i > q.length - 4; i--) if (q[i].t <= T && T - q[i].t < 0.12) on = true; dot.classList.toggle('on', on);
+    core.advance(T); beeps(T); cuffFrame(T);
     if (performance.now() - lastNum > 250) { lastNum = performance.now(); nums(T); }
+    return T;
+  }
+  if (!EMBED) {
+    setInterval(tick, 500);
+    try { const w = new Worker(URL.createObjectURL(new Blob(['setInterval(function(){postMessage(1)},40)'], { type: 'text/javascript' }))); w.onmessage = tick; window.__pl_worker = w; } catch (e) { setInterval(tick, 80); }
+  }
+  function frame() {
+    const T = tick();
+    for (const c of CHD) drawChan(c, core.gen);
+    const q = core.gen.ev.qrs, dot = $('dot'); let on = false; for (let i = q.length - 1; i >= 0 && i > q.length - 4; i--) if (q[i].t <= T && T - q[i].t < 0.12) on = true; dot.classList.toggle('on', on);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
@@ -1374,7 +1406,7 @@ function startConsole() {
 
   const dbg = $('root');
   dbg.innerHTML = `
-<div class="top2"><div class="brand"><img class="logo" src="${LOGO}" alt=""><div><b>PULSELAB</b><small>Simulador de monitor multiparamétrico</small></div></div><span class="pill" id="p-mode"><i></i><span></span></span><span class="pill" id="p-disp"><i></i><span></span></span><span class="pill" id="p-run"><i></i><span></span></span><span class="pill" id="p-t"><i></i><span></span></span><div class="sp"></div><button class="btn bas" id="basal">${ic('refresh')}<span class="lb">Restaurar basal</span></button><button class="btn" id="run">${ic('play')}<span class="lb">Retomar</span></button><button class="btn" id="pause">${ic('pause')}<span class="lb">Congelar</span></button><button class="btn" id="restart" title="Reiniciar o traçado">${ic('restart')}<span class="lb">Reiniciar traçado</span></button><span style="width:6px"></span><button class="btn" id="mutebtn" title="Silenciar ou ativar todo o som da projeção"></button><button class="btn" id="phone" title="Controlar pelo celular"></button><button class="btn pri" id="open">${ic('monitor')}<span class="lb">Abrir projeção</span></button><button class="btn" id="openfs" title="Projeção em tela cheia">${ic('expand')}<span class="lb">Tela cheia</span></button></div>
+<div class="top2"><div class="brand"><img class="logo" src="${LOGO}" alt=""><div><b>PULSELAB</b><small>Simulador de monitor multiparamétrico</small></div></div><div class="pills"><span class="pill" id="p-mode"><i></i><span></span></span><span class="pill" id="p-disp"><i></i><span></span></span><span class="pill" id="p-run"><i></i><span></span></span><span class="pill" id="p-t"><i></i><span></span></span></div><div class="acts"><div class="seg" role="group" aria-label="Tempo da simulação"><button class="btn ghost" id="run" title="Retomar a simulação (Espaço)" aria-label="Retomar">${ic('play')}</button><button class="btn ghost" id="pause" title="Congelar a simulação (Espaço)" aria-label="Congelar">${ic('pause')}</button></div><button class="btn ghost" id="restart" title="Reiniciar o traçado" aria-label="Reiniciar traçado">${ic('restart')}</button><button class="btn bas" id="basal" title="Voltar ao cenário basal">${ic('refresh')}<span class="lb">Restaurar basal</span></button><span class="vsep"></span><button class="btn ghost" id="mutebtn" title="Silenciar ou ativar todo o som da projeção"></button><button class="btn ghost" id="phone" title="Controlar pelo celular"></button><button class="btn ghost" id="openfs" title="Abrir projeção em tela cheia" aria-label="Projeção em tela cheia">${ic('expand')}</button><button class="btn pri" id="open" title="Abrir a projeção em uma janela">${ic('monitor')}<span class="lb">Abrir projeção</span></button></div></div>
 <div class="ro hide" id="ro"><b>Outro console assumiu o controle desta sessão.</b><span>Este está somente leitura.</span><button class="btn" id="take">Assumir controle</button></div>
 <div class="cwrap">
 <aside class="lcol">
@@ -1574,7 +1606,7 @@ ${sel('d-grid', 'Grade do ECG (1 mm / 5 mm)', [['1', 'Ligada'], ['0', 'Desligada
     const run = S.clock.running; const pr = $('p-run'); pr.className = 'pill ' + (run ? 'ok' : 'warn'); pr.lastChild.textContent = run ? 'Em curso ×' + S.clock.rate : 'Congelado';
     $('run').disabled = run; $('pause').disabled = !run; $('auto').checked = S.scen.auto; $('rev').textContent = 'rev ' + S.rev;
     const pm = $('p-mode'); pm.className = 'pill ' + (readOnly ? 'bad' : (live ? 'ok' : 'warn')); pm.lastChild.textContent = readOnly ? 'Somente leitura' : (live ? 'Ao vivo' : 'Preparando (rascunho)');
-    $('mutebtn').innerHTML = ic(S.audio.mute ? 'mute' : 'speaker') + '<span class="lb">' + (S.audio.mute ? 'Mudo' : 'Som') + '</span>'; $('mutebtn').classList.toggle('dan', !!S.audio.mute); rates(); renderScs(); renderPhase(); renderAlarmsForm(); renderSoundForm(); renderDisplayForm(); renderParams(); paintRanges();
+    $('mutebtn').innerHTML = ic(S.audio.mute ? 'mute' : 'speaker') + '<span class="sr">' + (S.audio.mute ? 'Mudo' : 'Som') + '</span>'; $('mutebtn').classList.toggle('muted', !!S.audio.mute); $('mutebtn').setAttribute('aria-label', S.audio.mute ? 'Som desligado: ativar' : 'Som ligado: silenciar'); $('mutebtn').classList.toggle('dan', !!S.audio.mute); rates(); renderScs(); renderPhase(); renderAlarmsForm(); renderSoundForm(); renderDisplayForm(); renderParams(); paintRanges();
   }
   function paintRanges(r) { (r ? [r] : document.querySelectorAll('.cwrap input[type=range]')).forEach(x => x.style.setProperty('--p', ((x.value - x.min) / ((x.max - x.min) || 1) * 100) + '%')); }
   document.addEventListener('input', e => { if (e.target && e.target.type === 'range') paintRanges(e.target); });
@@ -1586,7 +1618,12 @@ ${sel('d-grid', 'Grade do ECG (1 mm / 5 mm)', [['1', 'Ligada'], ['0', 'Desligada
   $('run').onclick = () => commit(n => reanchor(n, true)); $('pause').onclick = () => commit(n => reanchor(n, false));
   $('restart').onclick = () => commit(n => { reanchor(n, n.clock.running); n.epoch++; n.epochT = clockT(n.clock, now()); n.seed = (n.seed * 1664525 + 1013904223) >>> 0 || 1; toast('Traçado reiniciado'); });
   $('basal').onclick = () => applyScenario('basal'); $('auto').onchange = e => commit(n => n.scen.auto = e.target.checked);
-  $('open').onclick = () => window.open(projUrl(), 'pulselab_projection'); $('openfs').onclick = () => window.open(projUrl() + '&fullscreen=1', 'pulselab_projection');
+  function openProj(full) {
+    const sw = screen.availWidth || 1280, sh = screen.availHeight || 720, w = full ? sw : Math.min(1280, Math.round(sw * .8)), h = full ? sh : Math.round(w * 9 / 16) + 40, l = (screen.availLeft || 0) + Math.round((sw - w) / 2), t = (screen.availTop || 0) + Math.round((sh - h) / 2);
+    const win = window.open(projUrl() + (full ? '&fullscreen=1' : ''), 'pulselab_projection', `popup=yes,width=${w},height=${h},left=${l},top=${t},resizable=yes,scrollbars=no`);
+    if (!win) toast('O navegador bloqueou a janela: permita pop-ups para este site.'); else try { win.focus(); } catch (e) {}
+  }
+  $('open').onclick = () => openProj(false); $('openfs').onclick = () => openProj(true);
   function projUrl() { const u = new URL(location.href); u.search = ''; u.searchParams.set('mode', 'projection'); return u.href; }
   $('tabs').querySelectorAll('.tab').forEach(b => b.onclick = () => { tab = b.dataset.tab; $('tabs').querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('.page').forEach(p => p.classList.toggle('on', p.id === 'pg-' + tab)); });
   window.addEventListener('keydown', e => {
@@ -1696,7 +1733,7 @@ window.addEventListener('keydown', e => { if (e.key === 'Escape' && !mod.classLi
 $('phone').onclick = phOpen;
 function qrSvg(text) { loadLib('vend-qr'); const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); }
 function rmRender() {
-  const n = RM.conns.size, b = $('phone'); if (b) { b.innerHTML = ic('phone') + '<span class="lb">Celular' + (n ? ' · ' + n : '') + '</span>'; b.classList.toggle('pri', n > 0); }
+  const n = RM.conns.size, b = $('phone'); if (b) { b.innerHTML = ic('phone') + (n ? '<span class="cnt">' + n + '</span>' : '') + '<span class="sr">Celular' + (n ? ' · ' + n : '') + '</span>'; b.classList.toggle('pri', n > 0); }
   if (mod.classList.contains('hide')) return;
   const url = remoteUrl(RM.pin), local = /^(file:|about:)/.test(location.protocol), pinTxt = RM.pin ? RM.pin.slice(0, 3) + ' ' + RM.pin.slice(3) : '--- ---';
   let body;

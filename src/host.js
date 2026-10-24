@@ -85,7 +85,7 @@ window.addEventListener('keydown', e => { if (e.key === 'Escape' && !mod.classLi
 $('phone').onclick = phOpen;
 function qrSvg(text) { loadLib('vend-qr'); const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); }
 function rmRender() {
-  const n = RM.conns.size, b = $('phone'); if (b) { b.innerHTML = ic('phone') + '<span class="lb">Celular' + (n ? ' · ' + n : '') + '</span>'; b.classList.toggle('pri', n > 0); }
+  const n = RM.conns.size, b = $('phone'); if (b) { b.innerHTML = ic('phone') + (n ? '<span class="cnt">' + n + '</span>' : '') + '<span class="sr">Celular' + (n ? ' · ' + n : '') + '</span>'; b.classList.toggle('pri', n > 0); }
   if (mod.classList.contains('hide')) return;
   const url = remoteUrl(RM.pin), local = /^(file:|about:)/.test(location.protocol), pinTxt = RM.pin ? RM.pin.slice(0, 3) + ' ' + RM.pin.slice(3) : '--- ---';
   let body;

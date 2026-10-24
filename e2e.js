@@ -18,7 +18,7 @@ const STUB = () => { const log = []; window.__aud = { log, resumes: 0 };
   const base = 'http://127.0.0.1:' + srv.address().port + '/';
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox'] });
   const ctx = await b.newContext({ viewport: { width: 1920, height: 1080 } }); await ctx.addInitScript(STUB);
-  const reqs = [], errs = []; ctx.on('request', r => { if (!r.url().startsWith(base) && !r.url().startsWith('data:')) reqs.push(r.url()); });
+  const reqs = [], errs = []; ctx.on('request', r => { if (!r.url().startsWith(base) && !r.url().startsWith('data:') && !r.url().startsWith('blob:')) reqs.push(r.url()); });
   const con = await ctx.newPage(); con.on('pageerror', e => errs.push('console: ' + e)); con.on('console', m => { if (m.type() === 'error') errs.push('console.log: ' + m.text()); });
   await con.goto(base); await con.waitForTimeout(1500);
   const disp = await ctx.newPage(); disp.on('pageerror', e => errs.push('display: ' + e)); disp.on('console', m => { if (m.type() === 'error') errs.push('display.log: ' + m.text()); });
@@ -140,6 +140,29 @@ const STUB = () => { const log = []; window.__aud = { log, resumes: 0 };
   await con.evaluate(() => window.__pl.commit(n => { n.audio.mute = true; })); await disp.waitForTimeout(600); const n2 = await nz(); await disp.waitForTimeout(1500);
   check('Mudo geral também silencia a bomba', (await nz()) === n2);
   await con.evaluate(() => window.__pl.commit(n => { n.audio.mute = false; }));
+  // ---- v7: barra superior cabe, janela popup, som em segundo plano, FC oscilando ----
+  for (const [w, h] of [[1920, 1080], [1536, 864], [1366, 768], [1280, 720], [1100, 700]]) {
+    await con.setViewportSize({ width: w, height: h }); await con.waitForTimeout(300);
+    const r = await con.evaluate(() => { const q = id => document.getElementById(id).getBoundingClientRect(), o = q('open'), f = q('openfs'), v = document.documentElement; return { sw: v.scrollWidth, iw: innerWidth, open: [Math.round(o.left), Math.round(o.right)], fs: [Math.round(f.left), Math.round(f.right)], ok: o.right <= innerWidth && o.left >= 0 && f.right <= innerWidth && f.width > 20 && o.width > 20 }; });
+    check(`Barra superior ${w}px: «Abrir projeção» e tela cheia visíveis, sem rolagem lateral`, r.ok && r.sw <= r.iw, JSON.stringify(r));
+  }
+  await con.setViewportSize({ width: 1920, height: 1080 });
+  check('Retomar/Congelar são só ícones, agrupados num mesmo quadro', await con.evaluate(() => { const g = document.querySelector('.seg'); return !!g && g.contains(document.getElementById('run')) && g.contains(document.getElementById('pause')) && document.getElementById('run').textContent.trim() === '' && document.getElementById('pause').textContent.trim() === ''; }));
+  check('Botão de som é só ícone (sem a palavra visível)', await con.evaluate(() => { const b = document.getElementById('mutebtn'); return !!b.querySelector('svg') && !b.querySelector('.lb'); }));
+  const [pop] = await Promise.all([ctx.waitForEvent('page', { timeout: 5000 }), con.click('#open')]); await pop.waitForLoadState();
+  const pw = await pop.evaluate(() => ({ popupBar: window.toolbar && window.toolbar.visible === false, mode: new URLSearchParams(location.search).get('mode'), w: window.outerWidth }));
+  check('«Abrir projeção» abre uma janela (popup) e não uma guia', pw.popupBar && pw.mode === 'projection', JSON.stringify(pw)); await pop.close();
+  // som em segundo plano: página sem requestAnimationFrame (como uma janela oculta/coberta) continua tocando e avisando o console
+  const bg = await ctx.newPage(); await bg.addInitScript(() => { window.requestAnimationFrame = () => 0; }); await bg.goto(base + '?mode=projection'); await bg.mouse.click(300, 300);
+  await con.evaluate(() => { window.__pl.commit(n => { n.audio.beep = true; n.audio.beepSrc = 'ecg'; n.audio.mute = false; n.alarm.silencedUntil = 0; }); window.__pl.applyScenario('basal'); }); await bg.waitForTimeout(1500); const l0 = await bg.evaluate(() => window.__aud.log.length); await bg.waitForTimeout(6000); const l1 = await bg.evaluate(() => window.__aud.log.length);
+  check('Som em segundo plano: sem desenho (rAF parado) o bip de FC continua tocando', l1 - l0 >= 6, `${l1 - l0} bips em 6 s`);
+  check('Segundo plano: a projeção segue avisando o console (sinal de vida)', await con.evaluate(() => [...document.querySelectorAll('.pill')].some(p => /conectada/i.test(p.textContent))));
+  await con.evaluate(() => window.__pl.applyScenario('vf')); await bg.waitForTimeout(9000);
+  check('Segundo plano: alarme de FV toca (988 Hz) mesmo sem desenho', await bg.evaluate(() => window.__aud.log.some(x => x[1] === 988)));
+  await con.evaluate(() => window.__pl.applyScenario('basal')); await bg.close();
+  await con.evaluate(() => window.__pl.commit(n => { n.var = true; n.p.from.hr = 89; n.p.to.hr = 89; n.p.dur = 0; n.rhythm = 'sinus'; n.scen = { id: 'custom', phase: 0, startP: 0, auto: false }; n.epoch++; n.epochT = 0; }));
+  const hrs = []; for (let i = 0; i < 40; i++) { await disp.waitForTimeout(1000); hrs.push(await disp.evaluate(() => Number(document.getElementById('v-hr').textContent))); }
+  const hv = hrs.filter(Number.isFinite).slice(10); check('FC de 89: o valor na tela oscila ±2–4 bpm e não fica parado', Math.max(...hv) - Math.min(...hv) >= 3 && Math.min(...hv) >= 84 && Math.max(...hv) <= 94 && new Set(hv).size >= 4, hv.join(','));
   // sincronização + recarga + JSON corrompido
   const t1 = Date.now(); await con.keyboard.press('5'); await disp.waitForFunction(() => window.__pl.S.scen.id === 'hemo', null, { timeout: 3000 }); check('Sincronização console → projeção < 1 s', Date.now() - t1 < 1000, (Date.now() - t1) + ' ms');
   await disp.reload(); await disp.waitForTimeout(1500); check('Recarregar a projeção restaura o cenário e mostra a tela inicial de som', await disp.evaluate(() => window.__pl.S.scen.id === 'hemo' && !document.getElementById('gate').classList.contains('hide')));

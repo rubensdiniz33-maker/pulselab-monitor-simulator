@@ -6,6 +6,7 @@ function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; le
 function gauss(r) { let u = 0; while (!u) u = r(); const v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 const g = (x, c, s, a) => a * Math.exp(-((x - c) * (x - c)) / (2 * s * s));
 
+const HR_DRIFT = new Set(['sinus', 'afib', 'flutter', 'svt', 'avb3', 'pea']);
 const PULSELESS = new Set(['vtp', 'vf', 'asys', 'pea', 'tdp']);
 const KEYS = ['hr', 'sys', 'dia', 'rr', 'spo2', 'etco2', 'temp'];
 const RHYTHMS = ['sinus', 'afib', 'flutter', 'svt', 'avb3', 'vt', 'tdp', 'vtp', 'vf', 'asys', 'pea', 'leadoff'];
@@ -37,6 +38,7 @@ function truth(S, P) {
 class Gen {
   constructor(truthAt, seed, t0) { this.truthAt = truthAt; this.reset(seed || 1, t0 || 0); }
   reset(seed, t0) {
+    const dr = mulberry32((seed ^ 0x9e3779b9) >>> 0); this.dph = [dr() * 6.2832, dr() * 6.2832, dr() * 6.2832];
     this.rng = mulberry32(seed); this.n0 = Math.floor(t0 * FS); this.n = this.n0;
     this.ecg = new Float32Array(RING); this.pl = new Float32Array(RING); this.rs = new Float32Array(RING); this.co = new Float32Array(RING);
     this.beats = []; this.pulses = []; this.next = t0 + 0.35; this.nextType = 'N'; this.afterV = 0; this.lastR = t0;
@@ -44,13 +46,15 @@ class Gen {
     this.br = null; this.bph = 0; this.bvar = 1; this.prevE = 0; this.peak = 0; this.rcls = '';
     this.vfph = [0, 0, 0]; this.fib = [0, 0, 0]; this.lastE = 0; this.shockAt = null;
   }
+  /* oscilação lenta e natural da FC (±2–3 bpm): soma de três ondas lentas com fases próprias da sessão */
+  hrDrift(t, hr) { const p = this.dph, A = hr > 170 ? 1.6 : 2.6, w = 2 * Math.PI * t; return A * (0.55 * Math.sin(w / 19 + p[0]) + 0.3 * Math.sin(w / 43 + p[1]) + 0.15 * Math.sin(w / 11 + p[2])); }
   advanceTo(T) { const N = Math.floor(T * FS); while (this.n < N) this.step(); }
   breathSin(t) { return this.br ? Math.sin(2 * Math.PI * this.bph) : 0; }
   sched(t, tr) {
     const cls = tr.rhythm === 'leadoff' ? 'sinus' : tr.rhythm;
     if (cls !== this.rcls) { this.rcls = cls; this.beats = []; this.pulses = []; this.nextType = 'N'; this.next = Math.max(t + 0.25, Math.min(this.next, t + 0.9)); }
     if (!['sinus', 'afib', 'flutter', 'svt', 'avb3', 'vt', 'vtp', 'pea'].includes(cls)) return;
-    const hr = clamp(tr.hr || 60, 20, 300), vis = tr.rhythm !== 'leadoff';
+    const hr0 = clamp(tr.hr || 60, 20, 300), hr = (tr.var && HR_DRIFT.has(cls)) ? clamp(hr0 + this.hrDrift(t, hr0), 20, 300) : hr0, vis = tr.rhythm !== 'leadoff';
     while (this.next <= t + 0.45) {
       const tR = this.next; let rr = 60 / hr, type = this.nextType, pf = 1, mean = rr;
       if (cls === 'sinus' || cls === 'pea') {

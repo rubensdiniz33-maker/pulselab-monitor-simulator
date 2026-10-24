@@ -56,7 +56,7 @@ body.embed .gate,body.embed .sndst{display:none}
 /* ---------- console do professor ---------- */
 body.console{overflow:auto;min-width:1000px}
 .top2{position:sticky;top:0;z-index:5;height:50px;display:flex;align-items:center;gap:8px;padding:0 14px;background:#0a110e;border-bottom:1px solid var(--line)}
-.top2 .btn{white-space:nowrap}.top2 .brand{white-space:nowrap}@media(max-width:1560px){#openfs,#p-t{display:none}}@media(max-width:1280px){#restart,#p-disp{display:none}}
+.top2 .btn{white-space:nowrap}.top2 .brand{white-space:nowrap}
 .brand{font-weight:900;letter-spacing:.18em;font-size:13px;margin-right:6px}.brand span{color:var(--acc)}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border:1px solid var(--line);border-radius:4px;font-size:12px;color:var(--mut);background:var(--panel);white-space:nowrap}
 .pill i{width:8px;height:8px;border-radius:50%;background:#5b6f64;display:inline-block}.pill.ok i{background:var(--acc);box-shadow:0 0 6px var(--acc)}.pill.warn i{background:var(--amb)}.pill.bad i{background:var(--red)}
@@ -298,8 +298,11 @@ function startDisplay() {
      O estado do áudio é local desta página e nunca é alterado pela sincronização de parâmetros. */
   let actx = null, nextSnd = 0, lastTop = 0, busyUntil = 0, lastBeepT = clockT(S.clock, now()), unlocked = false;
   const wantFs = qs.get('fullscreen') === '1';
+  /* tom de 20 Hz praticamente mudo: mantém a aba marcada como «tocando áudio», o que a protege de suspensão em segundo plano */
+  let keepNode = null;
+  function keepAlive() { if (keepNode) return; try { const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = 20; g.gain.value = 0.003; o.connect(g); g.connect(actx.destination); o.start(); keepNode = o; } catch (e) {} }
   function setUnlocked(v) {
-    unlocked = v; $('gate').classList.toggle('hide', v || EMBED);
+    unlocked = v; $('gate').classList.toggle('hide', v || EMBED); if (v && actx && !EMBED) keepAlive();
     const st = $('sndst'); st.textContent = EMBED ? '' : (v ? 'SOM ATIVO' : 'SOM DESLIGADO · CLIQUE NA TELA'); st.classList.toggle('off', !v);
   }
   function initAudio() {
@@ -420,13 +423,22 @@ function startDisplay() {
     if (!top) nextSnd = 0;
     if (now() - lastHb > 1000) { lastHb = now(); post({ t: 'hb', embed: EMBED, audio: EMBED ? 'none' : (unlocked ? 'ok' : 'wait'), alarms: al.map(a => ({ text: a.text, prio: a.prio })), T, m }); }
   }
-  function frame() {
+  /* tick = tudo o que NÃO é desenho (ondas, bip, alarmes, bomba, sinal de vida). Roda por um Worker, que o navegador
+     não reduz quando a janela está em segundo plano — por isso o som continua mesmo com outra aba/janela na frente. */
+  function tick() {
     const T = clockT(S.clock, now());
-    core.advance(T);
-    for (const c of CHD) drawChan(c, core.gen);
-    beeps(T); cuffFrame(T);
-    const q = core.gen.ev.qrs, dot = $('dot'); let on = false; for (let i = q.length - 1; i >= 0 && i > q.length - 4; i--) if (q[i].t <= T && T - q[i].t < 0.12) on = true; dot.classList.toggle('on', on);
+    core.advance(T); beeps(T); cuffFrame(T);
     if (performance.now() - lastNum > 250) { lastNum = performance.now(); nums(T); }
+    return T;
+  }
+  if (!EMBED) {
+    setInterval(tick, 500);
+    try { const w = new Worker(URL.createObjectURL(new Blob(['setInterval(function(){postMessage(1)},40)'], { type: 'text/javascript' }))); w.onmessage = tick; window.__pl_worker = w; } catch (e) { setInterval(tick, 80); }
+  }
+  function frame() {
+    const T = tick();
+    for (const c of CHD) drawChan(c, core.gen);
+    const q = core.gen.ev.qrs, dot = $('dot'); let on = false; for (let i = q.length - 1; i >= 0 && i > q.length - 4; i--) if (q[i].t <= T && T - q[i].t < 0.12) on = true; dot.classList.toggle('on', on);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
@@ -454,7 +466,7 @@ function startConsole() {
 
   const dbg = $('root');
   dbg.innerHTML = `
-<div class="top2"><div class="brand"><img class="logo" src="${LOGO}" alt=""><div><b>PULSELAB</b><small>Simulador de monitor multiparamétrico</small></div></div><span class="pill" id="p-mode"><i></i><span></span></span><span class="pill" id="p-disp"><i></i><span></span></span><span class="pill" id="p-run"><i></i><span></span></span><span class="pill" id="p-t"><i></i><span></span></span><div class="sp"></div><button class="btn bas" id="basal">${ic('refresh')}<span class="lb">Restaurar basal</span></button><button class="btn" id="run">${ic('play')}<span class="lb">Retomar</span></button><button class="btn" id="pause">${ic('pause')}<span class="lb">Congelar</span></button><button class="btn" id="restart" title="Reiniciar o traçado">${ic('restart')}<span class="lb">Reiniciar traçado</span></button><span style="width:6px"></span><button class="btn" id="mutebtn" title="Silenciar ou ativar todo o som da projeção"></button><button class="btn" id="phone" title="Controlar pelo celular"></button><button class="btn pri" id="open">${ic('monitor')}<span class="lb">Abrir projeção</span></button><button class="btn" id="openfs" title="Projeção em tela cheia">${ic('expand')}<span class="lb">Tela cheia</span></button></div>
+<div class="top2"><div class="brand"><img class="logo" src="${LOGO}" alt=""><div><b>PULSELAB</b><small>Simulador de monitor multiparamétrico</small></div></div><div class="pills"><span class="pill" id="p-mode"><i></i><span></span></span><span class="pill" id="p-disp"><i></i><span></span></span><span class="pill" id="p-run"><i></i><span></span></span><span class="pill" id="p-t"><i></i><span></span></span></div><div class="acts"><div class="seg" role="group" aria-label="Tempo da simulação"><button class="btn ghost" id="run" title="Retomar a simulação (Espaço)" aria-label="Retomar">${ic('play')}</button><button class="btn ghost" id="pause" title="Congelar a simulação (Espaço)" aria-label="Congelar">${ic('pause')}</button></div><button class="btn ghost" id="restart" title="Reiniciar o traçado" aria-label="Reiniciar traçado">${ic('restart')}</button><button class="btn bas" id="basal" title="Voltar ao cenário basal">${ic('refresh')}<span class="lb">Restaurar basal</span></button><span class="vsep"></span><button class="btn ghost" id="mutebtn" title="Silenciar ou ativar todo o som da projeção"></button><button class="btn ghost" id="phone" title="Controlar pelo celular"></button><button class="btn ghost" id="openfs" title="Abrir projeção em tela cheia" aria-label="Projeção em tela cheia">${ic('expand')}</button><button class="btn pri" id="open" title="Abrir a projeção em uma janela">${ic('monitor')}<span class="lb">Abrir projeção</span></button></div></div>
 <div class="ro hide" id="ro"><b>Outro console assumiu o controle desta sessão.</b><span>Este está somente leitura.</span><button class="btn" id="take">Assumir controle</button></div>
 <div class="cwrap">
 <aside class="lcol">
@@ -654,7 +666,7 @@ ${sel('d-grid', 'Grade do ECG (1 mm / 5 mm)', [['1', 'Ligada'], ['0', 'Desligada
     const run = S.clock.running; const pr = $('p-run'); pr.className = 'pill ' + (run ? 'ok' : 'warn'); pr.lastChild.textContent = run ? 'Em curso ×' + S.clock.rate : 'Congelado';
     $('run').disabled = run; $('pause').disabled = !run; $('auto').checked = S.scen.auto; $('rev').textContent = 'rev ' + S.rev;
     const pm = $('p-mode'); pm.className = 'pill ' + (readOnly ? 'bad' : (live ? 'ok' : 'warn')); pm.lastChild.textContent = readOnly ? 'Somente leitura' : (live ? 'Ao vivo' : 'Preparando (rascunho)');
-    $('mutebtn').innerHTML = ic(S.audio.mute ? 'mute' : 'speaker') + '<span class="lb">' + (S.audio.mute ? 'Mudo' : 'Som') + '</span>'; $('mutebtn').classList.toggle('dan', !!S.audio.mute); rates(); renderScs(); renderPhase(); renderAlarmsForm(); renderSoundForm(); renderDisplayForm(); renderParams(); paintRanges();
+    $('mutebtn').innerHTML = ic(S.audio.mute ? 'mute' : 'speaker') + '<span class="sr">' + (S.audio.mute ? 'Mudo' : 'Som') + '</span>'; $('mutebtn').classList.toggle('muted', !!S.audio.mute); $('mutebtn').setAttribute('aria-label', S.audio.mute ? 'Som desligado: ativar' : 'Som ligado: silenciar'); $('mutebtn').classList.toggle('dan', !!S.audio.mute); rates(); renderScs(); renderPhase(); renderAlarmsForm(); renderSoundForm(); renderDisplayForm(); renderParams(); paintRanges();
   }
   function paintRanges(r) { (r ? [r] : document.querySelectorAll('.cwrap input[type=range]')).forEach(x => x.style.setProperty('--p', ((x.value - x.min) / ((x.max - x.min) || 1) * 100) + '%')); }
   document.addEventListener('input', e => { if (e.target && e.target.type === 'range') paintRanges(e.target); });
@@ -666,7 +678,12 @@ ${sel('d-grid', 'Grade do ECG (1 mm / 5 mm)', [['1', 'Ligada'], ['0', 'Desligada
   $('run').onclick = () => commit(n => reanchor(n, true)); $('pause').onclick = () => commit(n => reanchor(n, false));
   $('restart').onclick = () => commit(n => { reanchor(n, n.clock.running); n.epoch++; n.epochT = clockT(n.clock, now()); n.seed = (n.seed * 1664525 + 1013904223) >>> 0 || 1; toast('Traçado reiniciado'); });
   $('basal').onclick = () => applyScenario('basal'); $('auto').onchange = e => commit(n => n.scen.auto = e.target.checked);
-  $('open').onclick = () => window.open(projUrl(), 'pulselab_projection'); $('openfs').onclick = () => window.open(projUrl() + '&fullscreen=1', 'pulselab_projection');
+  function openProj(full) {
+    const sw = screen.availWidth || 1280, sh = screen.availHeight || 720, w = full ? sw : Math.min(1280, Math.round(sw * .8)), h = full ? sh : Math.round(w * 9 / 16) + 40, l = (screen.availLeft || 0) + Math.round((sw - w) / 2), t = (screen.availTop || 0) + Math.round((sh - h) / 2);
+    const win = window.open(projUrl() + (full ? '&fullscreen=1' : ''), 'pulselab_projection', `popup=yes,width=${w},height=${h},left=${l},top=${t},resizable=yes,scrollbars=no`);
+    if (!win) toast('O navegador bloqueou a janela: permita pop-ups para este site.'); else try { win.focus(); } catch (e) {}
+  }
+  $('open').onclick = () => openProj(false); $('openfs').onclick = () => openProj(true);
   function projUrl() { const u = new URL(location.href); u.search = ''; u.searchParams.set('mode', 'projection'); return u.href; }
   $('tabs').querySelectorAll('.tab').forEach(b => b.onclick = () => { tab = b.dataset.tab; $('tabs').querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('.page').forEach(p => p.classList.toggle('on', p.id === 'pg-' + tab)); });
   window.addEventListener('keydown', e => {

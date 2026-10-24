@@ -118,8 +118,24 @@ body.console .pinbig{background:linear-gradient(90deg,#9bffcb,#6dd8ff);-webkit-b
 body.console .qrbox{border-radius:16px;box-shadow:0 0 0 6px #ffffff10,0 20px 40px -14px #000}
 body.console .phdev .row{border-radius:10px}
 
-@media(max-width:1560px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}#openfs,#p-t{display:none}}
-@media(max-width:1400px){body.console .cwrap{grid-template-columns:262px minmax(0,1fr) 400px}#restart .lb{display:none}#restart{padding:8px 10px}.brand small{display:none}}
-@media(max-width:1280px){#p-disp{display:none}}
+@media(max-width:1560px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:1400px){body.console .cwrap{grid-template-columns:262px minmax(0,1fr) 400px}}
 @media(max-width:1250px){body.console .cwrap{grid-template-columns:1fr;height:auto}.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){body.console *,body.console *::before,body.console *::after{animation:none!important;transition:none!important}}
+
+/* ===== v7: barra superior que sempre cabe na tela ===== */
+body.console{min-width:0}
+body.console .top2{overflow:hidden}
+.top2 .brand{flex:none}.top2 .pills{display:flex;gap:8px;flex:1 1 0;min-width:0;overflow:hidden;mask-image:linear-gradient(90deg,#000 88%,transparent)}
+.top2 .acts{display:flex;align-items:center;gap:6px;flex:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+body.console .btn.ghost{background:transparent;border-color:transparent;box-shadow:none;padding:8px 10px;color:#c3d6cb;position:relative}
+body.console .btn.ghost:hover:not([disabled]){background:#ffffff0f;border-color:#ffffff1c;box-shadow:none;transform:none;color:#fff}
+body.console .btn.ghost.muted{color:#ff8b94;background:#3a1519}
+.seg{display:inline-flex;border:1px solid var(--bd);border-radius:11px;background:#ffffff06;padding:2px;gap:2px}
+.seg .btn.ghost{padding:7px 11px;border-radius:9px}.seg .btn.ghost[disabled]{opacity:1;color:var(--acc);background:#4dff9a1c;box-shadow:inset 0 0 0 1px #4dff9a55}
+.vsep{width:1px;height:24px;background:var(--bd);margin:0 4px}
+#phone .cnt{position:absolute;top:1px;right:1px;min-width:17px;height:17px;border-radius:9px;background:var(--acc);color:#03170d;font-size:10.5px;font-weight:800;display:grid;place-items:center;padding:0 4px;animation:pop .25s both}
+@media(max-width:1500px){.top2 .brand small{display:none}#p-t{display:none}}
+@media(max-width:1280px){#basal .lb{display:none}#basal{padding:8px 10px}.top2 .brand b{display:none}}
+@media(max-width:1000px){#p-disp,#p-run{display:none}.top2{padding:0 10px}}

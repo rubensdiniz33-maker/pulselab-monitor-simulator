@@ -309,3 +309,16 @@ test('sanitize aceita st e novos ritmos, e rejeita lixo', () => {
   const S = defaultSession(); S.rhythm = 'avb3'; S.st = 9; const o = sanitize(JSON.parse(JSON.stringify(S)));
   assert.equal(o.rhythm, 'avb3'); assert.equal(o.st, 0.8); S.rhythm = 'xx'; assert.equal(sanitize(JSON.parse(JSON.stringify(S))).rhythm, 'sinus');
 });
+
+/* ---------- v7: oscilação natural da FC ---------- */
+test('FC medida oscila ±2–4 bpm ao longo de 90 s (não fica parada) e não passa disso', () => {
+  const S = session({ v: { hr: 89 }, var: true, seed: 11 }); const c = new Core(); S.clock.running = true; c.setState(S, 0); c.gen.reset(S.seed, 0); c.lastU = 0; c.T = 0;
+  const vals = []; for (let T = 0.25; T <= 90; T += 0.25) { c.advance(T); if (T > 12 && Math.abs(T % 1) < 1e-9) vals.push(c.meas.v.hr); }
+  const mn = Math.min(...vals), mx = Math.max(...vals);
+  assert.ok(mx - mn >= 3, `variação ${mn}–${mx}`); assert.ok(mn >= 89 - 5 && mx <= 89 + 5, `faixa ${mn}–${mx}`);
+  const trocas = vals.filter((v, i) => i && v !== vals[i - 1]).length; assert.ok(trocas >= 8, 'o valor deve mudar várias vezes: ' + trocas);
+});
+test('Sem variabilidade a FC é exata e constante', () => {
+  const c = run(session({ v: { hr: 89 }, var: false }), 40); const q = c.gen.ev.qrs.filter(e => e.t > 6);
+  for (let i = 1; i < q.length; i++) assert.ok(Math.abs(q[i].t - q[i - 1].t - 60 / 89) < 0.002);
+});

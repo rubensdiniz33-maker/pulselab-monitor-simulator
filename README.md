@@ -65,3 +65,9 @@ npm run e2e     # testes no navegador (precisa de playwright-core e Chromium)
 - **Console redesenhado (visual premium):** cartões de vidro com sombras e animações, cenários com ícones e cores por categoria (com busca), parâmetros com cores iguais às do monitor, painel de KPIs ao vivo com os valores medidos, ícones novos em todo o sistema e abas em estilo segmentado. Respeita «reduzir movimento» do sistema.
 - **Novo favicon** a partir da logo PulseLab (versão vetorial nítida para a aba + ícone da tela inicial).
 - Celular com o mesmo visual (ícones, cartões coloridos, logo).
+
+## Novidades da v7
+- **Barra superior que sempre cabe:** «Abrir projeção» e tela cheia ficam sempre visíveis (testado de 1100 a 1920 px, sem rolagem lateral). Iniciar/Congelar viraram ícones agrupados num único quadro discreto; «Som» virou só o ícone.
+- **Projeção em janela:** «Abrir projeção» abre uma janela do navegador (popup), não uma nova aba. Se o navegador bloquear, aparece um aviso para permitir pop-ups.
+- **Som que persiste em segundo plano:** bipes, alarmes, som da PNI e batimentos agora são gerados por um Web Worker (não pausado em abas ocultas) e a aba/janela é mantida como «tocando áudio». Funciona mesmo com a projeção atrás de outra janela.
+- **Variação natural da FC:** com «variabilidade» ligada, a FC oscila suavemente cerca de ±2–3 bpm (ex.: 89 → 86–92), sem ficar parada. Vale para ritmos com pulso (sinusal, FA, flutter, TSV, BAV, AESP).
