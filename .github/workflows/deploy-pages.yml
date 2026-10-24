@@ -1,0 +1,65 @@
+name: Publicar PulseLab no GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Testes do motor
+        run: npm test
+
+      - name: Gerar site com SHA do commit
+        run: BUILD_ID="$GITHUB_SHA" node build.js site/index.html
+
+      - name: Verificar arquivos publicados e identificador
+        shell: bash
+        run: |
+          test -s site/index.html
+          test -s site/monitor.html
+          test -s site/favicon.svg
+          grep -Fq "content=\"$GITHUB_SHA\"" site/index.html
+          echo "Build ID verificado: $GITHUB_SHA"
+          echo "Arquivos do site:"
+          find site -maxdepth 1 -type f -printf '%f (%s bytes)\\n' | sort
+
+      - name: Preparar artefato do Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Publicar no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
