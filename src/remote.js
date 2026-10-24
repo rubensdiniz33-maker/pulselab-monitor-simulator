@@ -19,7 +19,7 @@ function remoteUrl(pin) {
 /* =================== CELULAR: tela de controle =================== */
 function startRemote() {
   document.body.classList.add('remote'); document.title = 'PulseLab · Controle';
-  const LSP = 'pulselab:remote:pin', ICON = (document.querySelector('link[rel=icon][type="image/svg+xml"]') || {}).href || '';
+  const LSP = 'pulselab:remote:pin', ICON = LOGO;
   let S = defaultSession(), hb = null, view = 'sc', status = 'idle', errMsg = '', pin = '', query = '';
   let built = '', peer = null, conn = null, retryT = null, pingT = null, openT = null, lastPong = 0, draft = null, dirtyUntil = 0, sendT = null, everOnline = false;
   const now = () => Date.now(), el = id => document.getElementById(id);
@@ -27,10 +27,10 @@ function startRemote() {
   const rtoast = s => { const t = el('rm-toast'); t.textContent = s; t.classList.add('on'); clearTimeout(rtoast.h); rtoast.h = setTimeout(() => t.classList.remove('on'), 1800); };
   try { pin = (qs.get('pin') || localStorage.getItem(LSP) || '').replace(/\D/g, '').slice(0, 6); } catch (e) { pin = (qs.get('pin') || '').replace(/\D/g, '').slice(0, 6); }
 
-  $('root').innerHTML = `<div class="rm-top"><div class="rm-brand">${ICON ? `<img src="${ICON}" alt="">` : ''}PULSELAB</div><button class="rm-pill" id="rm-st" type="button" aria-label="Estado da conexão"><i></i><span>Desconectado</span></button><div class="sp"></div><button class="rm-mute" id="rm-mute" type="button" aria-label="Silenciar ou ativar o som do monitor">🔊</button></div>
+  $('root').innerHTML = `<div class="rm-top"><div class="rm-brand">${ICON ? `<img src="${ICON}" alt="">` : ''}<span>PULSELAB<small>controle remoto</small></span></div><button class="rm-pill" id="rm-st" type="button" aria-label="Estado da conexão"><i></i><span>Desconectado</span></button><div class="sp"></div><button class="rm-mute" id="rm-mute" type="button" aria-label="Silenciar ou ativar o som do monitor">${ic('speaker')}</button></div>
 <div class="rm-alert" id="rm-alert" role="status"></div>
 <main class="rm-main" id="rm-main"></main>
-<nav class="rm-nav" id="rm-nav"><button data-v="sc"><span>🩺</span>Cenários</button><button data-v="pa"><span>🎚️</span>Parâmetros</button><button data-v="ac"><span>⚡</span>Ações</button></nav>
+<nav class="rm-nav" id="rm-nav"><button data-v="sc">${ic('stetho')}Cenários</button><button data-v="pa">${ic('sliders')}Parâmetros</button><button data-v="ac">${ic('bolt')}Ações</button></nav>
 <div class="rm-toast" id="rm-toast"></div>`;
 
   /* ---------- transporte ---------- */
@@ -102,14 +102,14 @@ function startRemote() {
   /* ---------- telas ---------- */
   function renderAll() { renderTop(); if (!el('rm-main')) return; if (!everOnline && status !== 'online') { if (built !== 'pin') renderPin(); else syncPin(); return; } if (built !== view) buildView(); renderView(); }
   function renderTop() {
-    const mu = el('rm-mute'); if (mu) { mu.textContent = S.audio.mute ? '🔇' : '🔊'; mu.classList.toggle('on', !!S.audio.mute); mu.title = S.audio.mute ? 'Som desligado. Toque para ligar' : 'Som ligado. Toque para silenciar'; }
+    const mu = el('rm-mute'); if (mu) { mu.innerHTML = ic(S.audio.mute ? 'mute' : 'speaker'); mu.classList.toggle('on', !!S.audio.mute); mu.title = S.audio.mute ? 'Som desligado. Toque para ligar' : 'Som ligado. Toque para silenciar'; }
     el('rm-nav').style.display = (status === 'idle' || (!everOnline && status !== 'online')) ? 'none' : '';
     el('rm-nav').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
     renderAlert();
   }
   function renderAlert() {
     const a = el('rm-alert'); if (!a) return; const top = hb && hb.al && hb.al[0];
-    a.className = 'rm-alert' + (top && status === 'online' ? ' p' + top.prio : ''); a.textContent = top ? '🔔 ' + top.text + (hb.al.length > 1 ? '  +' + (hb.al.length - 1) : '') : '';
+    a.className = 'rm-alert' + (top && status === 'online' ? ' p' + top.prio : ''); a.innerHTML = top ? ic('bell') + ' ' + top.text + (hb.al.length > 1 ? '  +' + (hb.al.length - 1) : '') : '';
   }
   function renderPin() {
     built = 'pin'; el('rm-main').innerHTML = `<div class="rm-pin" id="rm-pinbox"><img src="${ICON}" alt="" width="72" height="72" style="border-radius:16px"><h1>Controle do monitor</h1><p>Digite o PIN de 6 dígitos mostrado no computador (botão «📱 Celular») ou aponte a câmera para o QR Code.</p><input id="rm-pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="000000" aria-label="PIN de 6 dígitos"><div class="rm-err" id="rm-err"></div><button class="rm-btn pri" id="rm-go" type="button">Conectar</button></div>`;
@@ -122,10 +122,10 @@ function startRemote() {
 
   function buildView() {
     const m = el('rm-main'); built = view;
-    if (view === 'sc') m.innerHTML = `<div class="rm-search"><input id="rm-q" type="search" placeholder="Buscar cenário…" autocomplete="off" aria-label="Buscar cenário"></div><button class="rm-basal" id="rm-basal" type="button">↺ Restaurar ritmo basal</button><div id="rm-list"></div>`;
+    if (view === 'sc') m.innerHTML = `<div class="rm-search">${ic('search')}<input id="rm-q" type="search" placeholder="Buscar cenário…" autocomplete="off" aria-label="Buscar cenário"></div><button class="rm-basal" id="rm-basal" type="button">${ic('refresh')} Restaurar ritmo basal</button><div id="rm-list"></div>`;
     else if (view === 'pa') m.innerHTML = `<div class="rm-row"><label for="rm-rh">Ritmo</label><select class="rm-sel" id="rm-rh">${Object.keys(RH).map(k => `<option value="${k}">${RH[k]}</option>`).join('')}</select></div>
 <div class="rm-row"><label for="rm-dur">Alcançar em</label><select class="rm-sel" id="rm-dur">${DURS.map(d => `<option value="${d[0]}">${d[1]}</option>`).join('')}</select></div>
-<div id="rm-pars">${PAR.map(p => `<div class="rm-par" id="pw-${p[0]}"><div class="rm-pt"><span>${p[6]}</span><small>${p[2]}</small></div><div class="rm-pv"><button class="rm-stp" data-k="${p[0]}" data-d="-1" aria-label="Diminuir ${p[1]}" type="button">−</button><output id="pv-${p[0]}"></output><button class="rm-stp" data-k="${p[0]}" data-d="1" aria-label="Aumentar ${p[1]}" type="button">+</button></div><input type="range" id="pr-${p[0]}" min="${p[3]}" max="${p[4]}" step="${p[5]}" aria-label="${p[1]}"><div class="rm-why" id="pn-${p[0]}"></div></div>`).join('')}</div>
+<div id="rm-pars">${PAR.map(p => `<div class="rm-par" id="pw-${p[0]}" style="--pc:${PCOL[p[0]]}"><div class="rm-pt"><span>${ic(PICON[p[0]])}${p[6]}</span><small>${p[2]}</small></div><div class="rm-pv"><button class="rm-stp" data-k="${p[0]}" data-d="-1" aria-label="Diminuir ${p[1]}" type="button">−</button><output id="pv-${p[0]}"></output><button class="rm-stp" data-k="${p[0]}" data-d="1" aria-label="Aumentar ${p[1]}" type="button">+</button></div><input type="range" id="pr-${p[0]}" min="${p[3]}" max="${p[4]}" step="${p[5]}" aria-label="${p[1]}"><div class="rm-why" id="pn-${p[0]}"></div></div>`).join('')}</div>
 <div class="rm-par" id="pw-ect"><div class="rm-pt"><span>EXTRASSÍSTOLES</span><small>por minuto</small></div><div class="rm-pv"><output id="pv-ect" style="font-size:30px"></output></div><input type="range" id="pr-ect" min="0" max="30" step="1" aria-label="Extrassístoles por minuto"></div>
 <label class="rm-chk"><input type="checkbox" id="rm-cpl"> Acoplar parâmetros (um muda os outros de forma fisiológica)</label>`;
     else m.innerHTML = `<div id="rm-act"></div>`;
@@ -142,10 +142,10 @@ function startRemote() {
     const L = el('rm-list'); if (!L) return; const q = query.trim().toLowerCase(); let h = '';
     for (const g of GROUPS) {
       const items = g[1].map(id => SC[id]).filter(s => s && (!q || (s.name + ' ' + s.sub + ' ' + g[0]).toLowerCase().includes(q)));
-      if (!items.length) continue; h += `<div class="rm-h">${g[0]}</div>`;
+      if (!items.length) continue; h += `<div class="rm-h" style="--g:${GCOL[g[0]]}"><i></i>${g[0]}</div>`;
       for (const s of items) {
         const on = S.scen.id === s.id, pl = s.rhythm === 'vtp' || s.rhythm === 'vf' || s.rhythm === 'asys' || s.rhythm === 'pea' || s.rhythm === 'tdp';
-        h += `<button class="rm-card${on ? ' on' : ''}${pl ? ' pl' : ''}" data-id="${s.id}" type="button"><span class="t"><span><b>${s.name}</b><small>${s.sub}</small></span>${s.ph.length > 1 ? `<span class="badge">${s.ph.length} fases</span>` : ''}</span>${on ? phaseHtml(s) : ''}</button>`;
+        h += `<button class="rm-card${on ? ' on' : ''}${pl ? ' pl' : ''}" data-id="${s.id}" type="button" style="--g:${SGC[s.id]}"><span class="t"><span class="ico">${ic(SCI[s.id] || 'pulse')}</span><span class="tx"><b>${s.name}</b><small>${s.sub}</small></span>${s.ph.length > 1 ? `<span class="badge">${s.ph.length} fases</span>` : ''}</span>${on ? phaseHtml(s) : ''}</button>`;
       }
     }
     L.innerHTML = h || '<div class="rm-why" style="padding:14px;font-size:15px">Nenhum cenário encontrado.</div>';
@@ -182,16 +182,16 @@ function startRemote() {
       el('pv-' + k).textContent = off ? '---' : (k === 'temp' ? Number(v).toFixed(1).replace('.', ',') : Math.round(v)); if (a !== el('pr-' + k)) el('pr-' + k).value = v; el('pr-' + k).disabled = off;
       el('pn-' + k).textContent = off ? lk[k] : '';
     });
-    el('pv-ect').textContent = draft.ectopy + '/min'; if (a !== el('pr-ect')) el('pr-ect').value = draft.ectopy; el('pr-ect').disabled = PULSELESS.has(draft.rhythm) && draft.rhythm !== 'pea';
+    el('pv-ect').textContent = draft.ectopy + '/min'; el('rm-pars').querySelectorAll('input[type=range]').forEach(x => x.style.setProperty('--p', ((x.value - x.min) / (x.max - x.min) * 100) + '%')); { const x = el('pr-ect'); x.style.setProperty('--p', (x.value / 30 * 100) + '%'); } if (a !== el('pr-ect')) el('pr-ect').value = draft.ectopy; el('pr-ect').disabled = PULSELESS.has(draft.rhythm) && draft.rhythm !== 'pea';
   }
 
   /* ações */
   function renderActions() {
-    const A = el('rm-act'); if (!A) return; const r = S.rhythm, arrest = PULSELESS.has(r) || r === 'vt', run = S.clock.running, sil = S.alarm.silencedUntil > now();
+    const A = el('rm-act'); if (!A) return; const I = (n) => ic(n); const r = S.rhythm, arrest = PULSELESS.has(r) || r === 'vt', run = S.clock.running, sil = S.alarm.silencedUntil > now();
     const chip = (v, lab) => `<button class="rm-btn${S.clock.rate === v ? ' on' : ''}" data-rate="${v}" type="button">${lab}</button>`;
-    A.innerHTML = `<div class="rm-h" style="margin-top:2px">Simulação</div><div class="rm-grid"><button class="rm-btn pri full" data-c="basal" type="button">↺ Restaurar ritmo basal</button><button class="rm-btn" data-c="${run ? 'pause' : 'resume'}" type="button">${run ? 'Ⅱ Congelar' : '▶ Retomar'}</button><button class="rm-btn" data-c="nibp" type="button">🩸 Medir PNI</button><button class="rm-btn full" data-c="silence" type="button">${sil ? '🔔 Reativar alarmes' : '🔕 Silenciar alarmes por 2 min'}</button></div>
+    A.innerHTML = `<div class="rm-h" style="margin-top:2px">Simulação</div><div class="rm-grid"><button class="rm-btn pri full" data-c="basal" type="button">${I('refresh')} Restaurar ritmo basal</button><button class="rm-btn" data-c="${run ? 'pause' : 'resume'}" type="button">${run ? I('pause') + ' Congelar' : I('play') + ' Retomar'}</button><button class="rm-btn" data-c="nibp" type="button">${I('cuff')} Medir PNI</button><button class="rm-btn full" data-c="silence" type="button">${sil ? I('bell') + ' Reativar alarmes' : I('bellOff') + ' Silenciar alarmes por 2 min'}</button></div>
 <div class="rm-h">Velocidade da aula</div><div class="rm-seg">${chip(1, '×1')}${chip(2, '×2')}${chip(5, '×5')}${chip(10, '×10')}</div>
-${arrest ? `<div class="rm-h">Parada cardíaca</div><div class="rm-grid">${['vf', 'vtp', 'vt', 'tdp'].includes(r) ? `<button class="rm-btn dan full" data-c="shock" type="button">⚡ ${r === 'vt' ? 'Cardioversão' : 'Choque'} 200 J</button>` : ''}${PULSELESS.has(r) ? `<button class="rm-btn${S.cpr ? ' on' : ''}" data-c="cpr" type="button">${S.cpr ? '■ Parar RCP' : '▶ Iniciar RCP'}</button><button class="rm-btn pri" data-c="rce" type="button">💓 RCE</button>` : ''}${r === 'vt' ? `<button class="rm-btn full" data-c="losepulse" type="button">Perder o pulso (TV → sem pulso)</button>` : ''}</div>
+${arrest ? `<div class="rm-h">Parada cardíaca</div><div class="rm-grid">${['vf', 'vtp', 'vt', 'tdp'].includes(r) ? `<button class="rm-btn dan full" data-c="shock" type="button">${I('bolt')} ${r === 'vt' ? 'Cardioversão' : 'Choque'} 200 J</button>` : ''}${PULSELESS.has(r) ? `<button class="rm-btn${S.cpr ? ' on' : ''}" data-c="cpr" type="button">${S.cpr ? I('pause') + ' Parar RCP' : I('play') + ' Iniciar RCP'}</button><button class="rm-btn pri" data-c="rce" type="button">${I('heart')} RCE</button>` : ''}${r === 'vt' ? `<button class="rm-btn full" data-c="losepulse" type="button">Perder o pulso (TV → sem pulso)</button>` : ''}</div>
 <div class="rm-row" style="margin-top:12px"><label for="rm-so">Após o choque</label><select class="rm-sel" id="rm-so"><option value="none">Mantém o ritmo</option><option value="asys">Assistolia</option><option value="pea">AESP</option><option value="rce">RCE (sinusal)</option></select></div>` : ''}`;
     A.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { const c = b.dataset.c; if (c === 'shock') { const o = el('rm-so'); cmd('shock', { out: o ? o.value : 'none' }); } else cmd(c); });
     A.querySelectorAll('[data-rate]').forEach(b => b.onclick = () => cmd('rate', { v: Number(b.dataset.rate) }));

@@ -5,7 +5,7 @@ const eng = fs.readFileSync(path.join(__dirname, 'src/engine.js'), 'utf8').repla
 let t = fs.readFileSync(path.join(__dirname, 'src/template.html'), 'utf8');
 t = t.replace('/*ENGINE*/', () => eng.replace("if (typeof module !== 'undefined' && module.exports) module.exports = ENGINE;", ''));
 const rd = f => fs.readFileSync(path.join(__dirname, f), 'utf8');
-t = t.replace('/*REMOTE_CSS*/', () => rd('src/remote.css')).replace('/*REMOTE_JS*/', () => rd('src/remote.js')).replace('/*HOST_JS*/', () => rd('src/host.js'));
+t = t.replace('/*REMOTE_CSS*/', () => rd('src/remote.css')).replace('/*REMOTE_JS*/', () => rd('src/remote.js')).replace('/*UI_JS*/', () => rd('src/ui.js')).replace('/*THEME_CSS*/', () => rd('src/theme.css')).replace('/*HOST_JS*/', () => rd('src/host.js'));
 t = t.replace('/*PEERJS*/', () => rd('vendor/peerjs.min.js').replace(/<\/script/gi, '<\\/script')).replace('/*QRCODE*/', () => rd('vendor/qrcode.min.js').replace(/<\/script/gi, '<\\/script'));
 const b64 = f => 'data:image/png;base64,' + fs.readFileSync(path.join(__dirname, 'src', f)).toString('base64');
 t = t.replace('__ICON_SVG__', () => 'data:image/svg+xml;base64,' + fs.readFileSync(path.join(__dirname, 'src/icon.svg')).toString('base64')).replace('__ICON_32__', () => b64('icon-32.png')).replace('__ICON_180__', () => b64('icon-180.png'));

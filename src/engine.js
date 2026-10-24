@@ -50,7 +50,7 @@ class Gen {
     const cls = tr.rhythm === 'leadoff' ? 'sinus' : tr.rhythm;
     if (cls !== this.rcls) { this.rcls = cls; this.beats = []; this.pulses = []; this.nextType = 'N'; this.next = Math.max(t + 0.25, Math.min(this.next, t + 0.9)); }
     if (!['sinus', 'afib', 'flutter', 'svt', 'avb3', 'vt', 'vtp', 'pea'].includes(cls)) return;
-    const hr = clamp(tr.hr || 60, 20, 260), vis = tr.rhythm !== 'leadoff';
+    const hr = clamp(tr.hr || 60, 20, 300), vis = tr.rhythm !== 'leadoff';
     while (this.next <= t + 0.45) {
       const tR = this.next; let rr = 60 / hr, type = this.nextType, pf = 1, mean = rr;
       if (cls === 'sinus' || cls === 'pea') {
@@ -256,9 +256,9 @@ function couple(prev, next, key) {
   const n = Object.assign({}, next), notes = [], d = next[key] - prev[key];
   const add = (k, delta, lo, hi) => { const nv = clamp(Math.round((n[k] + delta) * 10) / 10, lo, hi); if (nv !== n[k]) { notes.push(k.toUpperCase() + ' ' + (nv > n[k] ? '+' : '') + Math.round((nv - n[k]) * 10) / 10); n[k] = nv; } };
   if (!d) return { next: n, notes };
-  if (key === 'spo2' && next.spo2 < 94) { const dd = Math.min(d, 0); add('rr', -0.6 * dd, 0, 60); add('hr', next.spo2 < 70 ? 0 : -0.8 * dd, 0, 250); if (next.spo2 < 70 && n.hr > 50) { notes.push('FC → bradicardia hipóxica'); n.hr = 50; } }
-  if (key === 'sys' && next.sys > 0) { add('hr', -0.5 * d, 0, 250); add('rr', -0.1 * d, 0, 60); add('etco2', 0.2 * d, 0, 100); add('dia', 0.6 * d, 0, 200); }
-  if (key === 'temp') { add('hr', 9 * d, 0, 250); add('rr', 1.5 * d, 0, 60); }
+  if (key === 'spo2' && next.spo2 < 94) { const dd = Math.min(d, 0); add('rr', -0.6 * dd, 0, 60); add('hr', next.spo2 < 70 ? 0 : -0.8 * dd, 0, 300); if (next.spo2 < 70 && n.hr > 50) { notes.push('FC → bradicardia hipóxica'); n.hr = 50; } }
+  if (key === 'sys' && next.sys > 0) { add('hr', -0.5 * d, 0, 300); add('rr', -0.1 * d, 0, 60); add('etco2', 0.2 * d, 0, 100); add('dia', 0.6 * d, 0, 200); }
+  if (key === 'temp') { add('hr', 9 * d, 0, 300); add('rr', 1.5 * d, 0, 60); }
   if (key === 'rr') add('etco2', -0.5 * d, 0, 100);
   return { next: n, notes };
 }
@@ -351,7 +351,7 @@ const SCENARIOS = [
 
 /* ---------- sessão ---------- */
 const SIM0 = 30; // a simulação começa em T=30 s: já nasce com 26 s de histórico (a tela abre cheia)
-const DEFAULT_AUDIO = { vol: 70, beep: true, beepVol: 40, beepSrc: 'ecg', mute: false };
+const DEFAULT_AUDIO = { vol: 70, beep: true, beepVol: 40, beepSrc: 'ecg', mute: false, cuff: true };
 const DEFAULT_LAYOUT = { waves: ['ecg', 'pleth', 'resp', 'capno'], nums: ['hr', 'spo2', 'nibp', 'etco2', 'rr', 'temp'], hidden: [] };
 function cleanLayout(l) {
   const D = DEFAULT_LAYOUT, o = { waves: [], nums: [], hidden: [] }; l = l && typeof l === 'object' ? l : {};
@@ -386,20 +386,20 @@ function sanitize(raw) {
   S.ectopy = num(raw.ectopy, 0, 30, 0); S.st = num(raw.st, -0.5, 0.8, 0); S.cpr = !!raw.cpr; S.var = raw.var !== false;
   S.clock = Object.assign({}, D.clock, raw.clock); S.clock.rate = clamp(Number(S.clock.rate) || 1, 1, 20); S.clock.running = !!S.clock.running;
   for (const k of ['wall0', 'rt0', 'pt0']) S.clock[k] = num(S.clock[k], 0, 1e15, D.clock[k]);
-  const rng = { hr: [0, 250], sys: [0, 300], dia: [0, 200], rr: [0, 60], spo2: [0, 100], etco2: [0, 100], temp: [26, 43] };
+  const rng = { hr: [0, 300], sys: [0, 300], dia: [0, 200], rr: [0, 60], spo2: [0, 100], etco2: [0, 100], temp: [26, 43] };
   S.p = { from: {}, to: {}, t0: num(raw.p && raw.p.t0, 0, 1e9, 0), dur: num(raw.p && raw.p.dur, 0, 3600, 0) };
   for (const k of KEYS) { S.p.from[k] = num(raw.p && raw.p.from && raw.p.from[k], rng[k][0], rng[k][1], D.p.to[k]); S.p.to[k] = num(raw.p && raw.p.to && raw.p.to[k], rng[k][0], rng[k][1], D.p.to[k]); }
   S.scen = Object.assign({}, D.scen, raw.scen); S.nibp = Object.assign({}, D.nibp, raw.nibp);
   S.alarm = Object.assign({}, D.alarm, raw.alarm); S.alarm.limits = Object.assign({}, LIMITS, raw.alarm && raw.alarm.limits);
   S.display = Object.assign({}, DEFAULT_DISPLAY, raw.display);
   S.layout = cleanLayout(raw.layout);
-  S.audio = Object.assign({}, DEFAULT_AUDIO, raw.audio); S.audio.vol = num(S.audio.vol, 0, 100, 70); S.audio.beepVol = num(S.audio.beepVol, 0, 100, 40); S.audio.beep = S.audio.beep !== false; S.audio.mute = S.audio.mute === true; S.audio.beepSrc = S.audio.beepSrc === 'spo2' ? 'spo2' : 'ecg';
+  S.audio = Object.assign({}, DEFAULT_AUDIO, raw.audio); S.audio.vol = num(S.audio.vol, 0, 100, 70); S.audio.beepVol = num(S.audio.beepVol, 0, 100, 40); S.audio.beep = S.audio.beep !== false; S.audio.mute = S.audio.mute === true; S.audio.cuff = S.audio.cuff !== false; S.audio.beepSrc = S.audio.beepSrc === 'spo2' ? 'spo2' : 'ecg';
   return S;
 }
 function migrateV1(o) {
   const S = defaultSession(), map = { sinus: 'sinus', tachy: 'sinus', brady: 'sinus', afib: 'afib', vtach: 'vt', vfib: 'vf', asystole: 'asys' };
   S.rhythm = map[o.rhythm] || 'sinus';
-  const v = { hr: num(o.hr, 0, 250, 76), sys: num(o.sys, 0, 300, 120), dia: num(o.dia, 0, 200, 74), rr: num(o.rr, 0, 60, 15), spo2: num(o.spo2, 0, 100, 98), etco2: num(o.etco2, 0, 100, 38), temp: num(o.temp, 30, 43, 36.7) };
+  const v = { hr: num(o.hr, 0, 300, 76), sys: num(o.sys, 0, 300, 120), dia: num(o.dia, 0, 200, 74), rr: num(o.rr, 0, 60, 15), spo2: num(o.spo2, 0, 100, 98), etco2: num(o.etco2, 0, 100, 38), temp: num(o.temp, 30, 43, 36.7) };
   const r = rhythmRules(v, S.rhythm, false);
   S.p = { from: Object.assign({}, r), to: Object.assign({}, r), t0: 0, dur: 0 };
   S.clock.running = o.run !== false; S.alarm.on = o.alarms !== false; S.var = o.variability !== false;

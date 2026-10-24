@@ -16,6 +16,7 @@ Atalhos no console: **Espaço** congela/retoma · **1–9** cenários · **A** s
 - **Os números vêm das ondas.** FC dos QRS, FC de pulso da pleth, FR e EtCO₂ do capnograma, SpO₂ com média e atraso, PNI em ciclo de 32 s com manguito.
 - **Ritmos:** sinusal (taqui/bradi), FA com R-R irregular, flutter atrial 2:1, TSV, BAV total, supra de ST, TV, torsades de pointes, TV sem pulso, FV (grossa/fina), assistolia, AESP, eletrodo solto, extrassístoles. RCP, RCE e **choque 200 J** (artefato de descarga, depois o ritmo que o professor escolher).
 - **Alarmes** por prioridade (alta vermelho, média amarelo, baixa ciano), com atraso, limites editáveis, apneia, eletrodo solto e som próprio de cada prioridade, automáticos. Silenciar 2 min com contagem.
+- **Som da bomba do manguito** durante a PNI (motor enchendo, estalos da válvula, escape final), ligável na aba Som.
 - **Bip de FC** ligável: tom fixo no QRS ou pelo pulso da SpO₂ (o tom acompanha a saturação). Não toca em FV, assistolia ou eletrodo solto.
 - **31 cenários** (v5), vários com evolução em fases (hemorragia, sepse, hipoxemia), tempo de aula ×1/×2/×5/×10, acoplamento fisiológico opcional e **registro dos eventos da aula**.
 
@@ -57,3 +58,10 @@ npm run e2e     # testes no navegador (precisa de playwright-core e Chromium)
   - Limitações: precisa de internet nos dois aparelhos; Wi‑Fi com isolamento de clientes (comum em escolas) pode bloquear a conexão direta – use os dados móveis no celular. O QR só funciona com o site publicado (GitHub Pages), não com o arquivo aberto do disco.
   - Servidor próprio (opcional): `?ph=host&pp=porta&ps=1` na URL do console e do celular apontam para um PeerServer seu.
 - Testes: `npm test` (motor), `npm run e2e` (monitor), `npm run e2e:remote` (console + celular, com PeerServer local).
+
+## Novidades da v6
+- **Som da bomba da PNI:** ao medir a pressão, a projeção reproduz o compressor do manguito (enche ~10 s, esvazia em degraus com estalos, escape no final). Respeita o volume dos alarmes e o mudo; checkbox e botão de teste na aba **Som**.
+- **FC até 300 bpm** (console e celular).
+- **Console redesenhado (visual premium):** cartões de vidro com sombras e animações, cenários com ícones e cores por categoria (com busca), parâmetros com cores iguais às do monitor, painel de KPIs ao vivo com os valores medidos, ícones novos em todo o sistema e abas em estilo segmentado. Respeita «reduzir movimento» do sistema.
+- **Novo favicon** a partir da logo PulseLab (versão vetorial nítida para a aba + ícone da tela inicial).
+- Celular com o mesmo visual (ícones, cartões coloridos, logo).

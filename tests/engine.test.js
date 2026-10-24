@@ -30,7 +30,7 @@ test('ECG sinusal 60 bpm sem variabilidade: R-R exato de 1000 ms', () => {
 });
 
 test('FC medida da onda = alvo (±2 bpm) em 40, 60, 100, 150 e 180', () => {
-  for (const hr of [40, 60, 100, 150, 180]) {
+  for (const hr of [40, 60, 100, 150, 180, 240, 300]) {
     const c = run(session({ v: { hr }, var: true }), 45);
     assert.ok(Math.abs(c.meas.v.hr - hr) <= 2, `alvo ${hr} medido ${c.meas.v.hr}`);
   }
@@ -165,7 +165,7 @@ test('Propriedades: 1000 entradas aleatórias do professor nunca geram valores i
   const r = E.mulberry32(5);
   for (let i = 0; i < 1000; i++) {
     const S = defaultSession(); S.rhythm = E.RHYTHMS[Math.floor(r() * E.RHYTHMS.length)];
-    const v = { hr: r() * 250, sys: r() * 300, dia: r() * 200, rr: r() * 60, spo2: r() * 100, etco2: r() * 100, temp: 30 + r() * 13 };
+    const v = { hr: r() * 300, sys: r() * 300, dia: r() * 200, rr: r() * 60, spo2: r() * 100, etco2: r() * 100, temp: 30 + r() * 13 };
     S.p = { from: v, to: v, t0: 0, dur: 0 };
     const t = truth(S, 5);
     assert.ok(t.sys === 0 || t.sys > t.dia, 'PAS>PAD'); assert.ok(Object.values({ a: t.sys, b: t.dia, c: t.hr, d: t.rr, e: t.spo2, f: t.etco2 }).every(x => Number.isFinite(x) && x >= 0));
@@ -205,7 +205,7 @@ test('Sessão: migração v1 → v2, JSON corrompido → padrão, limites aplica
   const S = sanitize(v1); assert.equal(S.schema, 2); assert.equal(S.rhythm, 'vt'); assert.equal(S.display.speed, 50); assert.equal(S.display.gain, 2); assert.equal(S.display.grid, false); assert.equal(S.display.capno, false);
   assert.equal(sanitize('lixo').schema, 2); assert.equal(sanitize(null).rhythm, 'sinus');
   const bad = sanitize({ schema: 2, rhythm: 'xyz', p: { to: { hr: 9999, sys: -5 } }, clock: { rate: 999 } });
-  assert.equal(bad.rhythm, 'sinus'); assert.equal(bad.p.to.hr, 250); assert.equal(bad.p.to.sys, 0); assert.equal(bad.clock.rate, 20);
+  assert.equal(bad.rhythm, 'sinus'); assert.equal(bad.p.to.hr, 300); assert.equal(bad.p.to.sys, 0); assert.equal(bad.clock.rate, 20);
 });
 
 test('Parada: SpO₂, PNI e FC de pulso aparecem como "---"; EtCO₂ cai; RCP mantém 10–20 mmHg', () => {

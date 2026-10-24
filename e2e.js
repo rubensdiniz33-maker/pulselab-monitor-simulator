@@ -7,8 +7,12 @@ const results = []; const check = (name, ok, extra) => { results.push([name, !!o
 const STUB = () => { const log = []; window.__aud = { log, resumes: 0 };
   class FakeAC { constructor() { this.state = 'suspended'; this.currentTime = 0; this.destination = {}; window.__aud.ctx = this; }
     resume() { window.__aud.resumes++; this.state = 'running'; this.onstatechange && this.onstatechange(); return Promise.resolve(); }
-    createOscillator() { const o = { frequency: { value: 0 }, type: '', connect() {}, start() { log.push([performance.now(), o.frequency.value]); }, stop() {} }; return o; }
-    createGain() { return { gain: { setValueAtTime() {}, linearRampToValueAtTime() {} }, connect() {} }; } }
+    createOscillator() { const o = { frequency: { value: 0, setTargetAtTime() {} }, type: '', connect() {}, disconnect() {}, start() { if (o.frequency.value >= 200) log.push([performance.now(), o.frequency.value]); }, stop() {} }; return o; }
+    createBiquadFilter() { return { frequency: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, setTargetAtTime() {} }, Q: { value: 0 }, type: '', connect() {}, disconnect() {} }; }
+    createBuffer(c, n) { return { getChannelData() { return new Float32Array(n); } }; }
+    createBufferSource() { return { buffer: null, loop: false, connect() {}, disconnect() {}, start() { window.__aud.noise = (window.__aud.noise || 0) + 1; }, stop() {} }; }
+    get sampleRate() { return 48000; }
+    createGain() { const g = { gain: { value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {}, setTargetAtTime(v) { g.gain.value = v; if (window.__aud.cuffOut === g) window.__aud.cuffLevel = v; } }, connect() {}, disconnect() {} }; return g; } }
   window.AudioContext = FakeAC; };
 (async () => {
   const base = 'http://127.0.0.1:' + srv.address().port + '/';
@@ -127,6 +131,15 @@ const STUB = () => { const log = []; window.__aud = { log, resumes: 0 };
   // PNI
   await con.evaluate(() => window.__pl.applyScenario('basal')); await con.click('#nibpnow'); await disp.waitForTimeout(3000); await disp.screenshot({ path: out + '/11-pni.png' });
   check('PNI: durante a medição mostra «MEDINDO» e a pressão do manguito', await disp.evaluate(() => /MEDINDO/.test(document.getElementById('s-nibp').textContent)));
+  const nz = () => disp.evaluate(() => window.__aud.noise || 0);
+  check('Som da bomba do manguito toca durante a medição da PNI', (await nz()) > 0, await nz());
+  await con.evaluate(() => window.__pl.commit(n => { n.audio.cuff = false; })); await disp.waitForTimeout(600); const n1 = await nz(); await disp.waitForTimeout(1500);
+  check('Desligar «som da bomba» silencia a PNI (sem novas fontes de som)', (await nz()) === n1);
+  await con.evaluate(() => window.__pl.commit(n => { n.audio.cuff = true; })); await disp.waitForTimeout(1200);
+  check('Religar o som da bomba volta a tocar na mesma medição', (await nz()) > n1);
+  await con.evaluate(() => window.__pl.commit(n => { n.audio.mute = true; })); await disp.waitForTimeout(600); const n2 = await nz(); await disp.waitForTimeout(1500);
+  check('Mudo geral também silencia a bomba', (await nz()) === n2);
+  await con.evaluate(() => window.__pl.commit(n => { n.audio.mute = false; }));
   // sincronização + recarga + JSON corrompido
   const t1 = Date.now(); await con.keyboard.press('5'); await disp.waitForFunction(() => window.__pl.S.scen.id === 'hemo', null, { timeout: 3000 }); check('Sincronização console → projeção < 1 s', Date.now() - t1 < 1000, (Date.now() - t1) + ' ms');
   await disp.reload(); await disp.waitForTimeout(1500); check('Recarregar a projeção restaura o cenário e mostra a tela inicial de som', await disp.evaluate(() => window.__pl.S.scen.id === 'hemo' && !document.getElementById('gate').classList.contains('hide')));

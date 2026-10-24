@@ -85,7 +85,7 @@ window.addEventListener('keydown', e => { if (e.key === 'Escape' && !mod.classLi
 $('phone').onclick = phOpen;
 function qrSvg(text) { loadLib('vend-qr'); const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); }
 function rmRender() {
-  const n = RM.conns.size, b = $('phone'); if (b) { b.textContent = '📱 Celular' + (n ? ' · ' + n : ''); b.classList.toggle('pri', n > 0); }
+  const n = RM.conns.size, b = $('phone'); if (b) { b.innerHTML = ic('phone') + '<span class="lb">Celular' + (n ? ' · ' + n : '') + '</span>'; b.classList.toggle('pri', n > 0); }
   if (mod.classList.contains('hide')) return;
   const url = remoteUrl(RM.pin), local = /^(file:|about:)/.test(location.protocol), pinTxt = RM.pin ? RM.pin.slice(0, 3) + ' ' + RM.pin.slice(3) : '--- ---';
   let body;
@@ -99,7 +99,7 @@ function rmRender() {
 <div class="row"><button class="btn" id="ph-new">Gerar novo PIN</button><span class="sp"></span><button class="btn dan" id="ph-off">Desativar celular</button></div>
 <div class="hint">Celular e computador precisam estar online. Em alguns Wi‑Fi de escolas (que isolam os aparelhos), use os dados móveis no celular.</div>`;
   }
-  mod.innerHTML = `<div class="mbox"><div class="mh"><b>📱 Controlar pelo celular</b><button class="btn sm" id="ph-x" aria-label="Fechar">✕</button></div><div class="mb">${body}</div></div>`;
+  mod.innerHTML = `<div class="mbox"><div class="mh"><b style="display:inline-flex;gap:9px;align-items:center">${ic('phone')} Controlar pelo celular</b><button class="btn sm" id="ph-x" aria-label="Fechar">${ic('x')}</button></div><div class="mb">${body}</div></div>`;
   $('ph-x').onclick = phClose; const on = $('ph-on'); if (on) on.onclick = () => rmStart(rmLoad().pin);
   const nw = $('ph-new'); if (nw) nw.onclick = () => { rmStop(true); rmStart(newPin()); };
   const off = $('ph-off'); if (off) off.onclick = () => rmStop(false);
