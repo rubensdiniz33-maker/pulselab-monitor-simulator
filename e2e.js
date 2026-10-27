@@ -7,7 +7,7 @@ const results = []; const check = (name, ok, extra) => { results.push([name, !!o
 const STUB = () => { const log = []; window.__aud = { log, resumes: 0 };
   class FakeAC { constructor() { this.state = 'suspended'; this.currentTime = 0; this.destination = {}; window.__aud.ctx = this; }
     resume() { window.__aud.resumes++; this.state = 'running'; this.onstatechange && this.onstatechange(); return Promise.resolve(); }
-    createOscillator() { const o = { frequency: { value: 0, setTargetAtTime() {} }, type: '', connect() {}, disconnect() {}, start() { if (o.frequency.value >= 200) log.push([performance.now(), o.frequency.value]); }, stop() {} }; return o; }
+    createOscillator() { const o = { frequency: { value: 0, setTargetAtTime() {}, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {} }, type: '', connect() {}, disconnect() {}, start() { if (o.frequency.value >= 200) log.push([performance.now(), o.frequency.value]); }, stop() {} }; return o; }
     createBiquadFilter() { return { frequency: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, setTargetAtTime() {} }, Q: { value: 0 }, type: '', connect() {}, disconnect() {} }; }
     createBuffer(c, n) { return { getChannelData() { return new Float32Array(n); } }; }
     createBufferSource() { return { buffer: null, loop: false, connect() {}, disconnect() {}, start() { window.__aud.noise = (window.__aud.noise || 0) + 1; }, stop() {} }; }
@@ -163,6 +163,32 @@ const STUB = () => { const log = []; window.__aud = { log, resumes: 0 };
   await con.evaluate(() => window.__pl.commit(n => { n.var = true; n.p.from.hr = 89; n.p.to.hr = 89; n.p.dur = 0; n.rhythm = 'sinus'; n.scen = { id: 'custom', phase: 0, startP: 0, auto: false }; n.epoch++; n.epochT = 0; }));
   const hrs = []; for (let i = 0; i < 40; i++) { await disp.waitForTimeout(1000); hrs.push(await disp.evaluate(() => Number(document.getElementById('v-hr').textContent))); }
   const hv = hrs.filter(Number.isFinite).slice(10); check('FC de 89: o valor na tela oscila ±2–4 bpm e não fica parado', Math.max(...hv) - Math.min(...hv) >= 3 && Math.min(...hv) >= 84 && Math.max(...hv) <= 94 && new Set(hv).size >= 4, hv.join(','));
+  // ---- v8: cronômetro da simulação, atalhos de teclado, som da bomba da PNI ----
+  const pillT = async () => { await con.waitForTimeout(1300); return con.evaluate(() => document.getElementById('p-t').textContent); };
+  await con.keyboard.press('r'); await con.waitForFunction(() => window.__pl.S.scen.id === 'basal', null, { timeout: 3000 });
+  let tt = await pillT(); check('Cronômetro «Simulação» recomeça do zero ao aplicar um cenário', /Simulação 0:0\d/.test(tt), tt);
+  await con.evaluate(() => window.__pl.commit(n => { n.clock.rt0 += 220000; })); tt = await pillT(); check('Cronômetro longo passa a h:mm:ss (não mostra 3672:37)', /Simulação \d+:\d\d:\d\d/.test(tt) && !/\d{3,}:\d\d$/.test(tt), tt);
+  await con.keyboard.press('r'); tt = await pillT(); check('Atalho R restaura o basal e zera o cronômetro', /Simulação 0:0\d/.test(tt), tt);
+  await con.keyboard.press('Space'); const tf1 = await pillT(); const tf2 = await pillT(); check('Cronômetro para quando a simulação está congelada', tf1 === tf2, tf1 + ' → ' + tf2); await con.keyboard.press('Space');
+  await con.keyboard.press('5'); await con.waitForFunction(() => window.__pl.S.scen.id === 'hemo'); await con.keyboard.press('r'); check('Atalho R volta ao basal a partir de outro cenário', await con.evaluate(() => window.__pl.S.scen.id === 'basal'));
+  await con.keyboard.press('5'); await con.keyboard.press('ArrowRight'); check('Seta → avança a fase do cenário', await con.evaluate(() => window.__pl.S.scen.phase >= 1));
+  await con.evaluate(() => { window.__pl.applyScenario('basal'); document.dispatchEvent(new Event('x')); window.dispatchEvent(new KeyboardEvent('keydown', { key: '5', ctrlKey: true, bubbles: true })); }); await con.waitForTimeout(200); check('Ctrl+tecla não dispara atalhos (não atrapalha Ctrl+R/C do navegador)', await con.evaluate(() => window.__pl.S.scen.id === 'basal'));
+  const m0 = await con.evaluate(() => window.__pl.S.audio.mute); await con.keyboard.press('m'); const m1 = await con.evaluate(() => window.__pl.S.audio.mute); await con.keyboard.press('m'); const m2 = await con.evaluate(() => window.__pl.S.audio.mute); check('Atalho M liga/desliga o som da projeção', m1 === !m0 && m2 === m0);
+  const q0 = await con.evaluate(() => window.__pl.S.nibp.seq); await con.keyboard.press('n'); check('Atalho N mede a PNI agora', await con.evaluate(q => window.__pl.S.nibp.seq === q + 1 && window.__pl.S.nibp.state === 'meas', q0));
+  await con.evaluate(() => window.__pl.applyScenario('vf')); await con.keyboard.press('c'); const c1 = await con.evaluate(() => window.__pl.S.cpr); await con.keyboard.press('c'); const c2 = await con.evaluate(() => window.__pl.S.cpr); check('Atalho C liga/desliga a RCP (em ritmo de parada)', c1 === true && c2 === false);
+  const sh0 = await con.evaluate(() => window.__pl.S.shockT); await con.keyboard.press('d'); check('Atalho D aplica o choque em ritmo chocável', await con.evaluate(s => window.__pl.S.shockT !== s, sh0));
+  await con.keyboard.press('e'); check('Atalho E dá o RCE e volta ao ritmo sinusal', await con.evaluate(() => window.__pl.S.rhythm === 'sinus'));
+  await con.keyboard.press('c'); check('C fora de ritmo de parada não liga a RCP', await con.evaluate(() => window.__pl.S.cpr === false));
+  await con.evaluate(() => document.activeElement && document.activeElement.blur()); await con.keyboard.press('?'); const kb1 = await con.evaluate(() => !document.getElementById('kbmodal').classList.contains('hide')); await con.keyboard.press('Escape'); const kb2 = await con.evaluate(() => document.getElementById('kbmodal').classList.contains('hide')); check('«?» abre a lista de atalhos e Esc fecha', kb1 && kb2);
+  await con.evaluate(() => window.__pl.applyScenario('basal')); await con.focus('#sc-q'); await con.keyboard.press('5'); await con.keyboard.press('r'); check('Digitar na busca não dispara atalhos', await con.evaluate(() => window.__pl.S.scen.id === 'basal' && document.getElementById('sc-q').value === '5r')); await con.evaluate(() => { const q = document.getElementById('sc-q'); q.value = ''; q.dispatchEvent(new Event('input')); q.blur(); });
+  const tplSrc = require('fs').readFileSync(__dirname + '/src/template.html', 'utf8'), cuffCode = tplSrc.slice(tplSrc.indexOf('let noiseBuf = null'), tplSrc.indexOf('function cuffFrame'));
+  const cuffM = await con.evaluate(async code => {
+    const SR = 22050, off = new OfflineAudioContext(1, SR * 34, SR); let fakeT = 0; const actx = new Proxy(off, { get(t, p) { if (p === 'currentTime') return fakeT; const v = t[p]; return typeof v === 'function' ? v.bind(t) : v; } });
+    const { cuffUpdate } = new Function('actx', 'NIBP_SECONDS', code + '; return { cuffUpdate };')(actx, 32); for (let el = 0; el < 32; el += 0.04) { fakeT = el; cuffUpdate(el, 0.315, 1); }
+    const d = (await off.startRendering()).getChannelData(0), pk = (a, b) => { let m = 0; for (let i = Math.floor(a * SR); i < Math.floor(b * SR); i++) m = Math.max(m, Math.abs(d[i])); return m; };
+    return { inf: pk(1, 9), def: pk(11, 29), exh: pk(30.7, 32) };
+  }, cuffCode);
+  check('Som da bomba da PNI: estalos da deflação bem abaixo do motor (sem «tiro»)', cuffM.def < 0.45 * cuffM.inf && cuffM.exh < 0.6 * cuffM.inf && cuffM.inf > 0.05, JSON.stringify(cuffM, (k, v) => typeof v === 'number' ? +v.toFixed(3) : v));
   // sincronização + recarga + JSON corrompido
   const t1 = Date.now(); await con.keyboard.press('5'); await disp.waitForFunction(() => window.__pl.S.scen.id === 'hemo', null, { timeout: 3000 }); check('Sincronização console → projeção < 1 s', Date.now() - t1 < 1000, (Date.now() - t1) + ' ms');
   await disp.reload(); await disp.waitForTimeout(1500); check('Recarregar a projeção restaura o cenário e mostra a tela inicial de som', await disp.evaluate(() => window.__pl.S.scen.id === 'hemo' && !document.getElementById('gate').classList.contains('hide')));

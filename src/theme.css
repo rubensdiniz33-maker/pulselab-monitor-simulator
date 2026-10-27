@@ -139,3 +139,6 @@ body.console .btn.ghost.muted{color:#ff8b94;background:#3a1519}
 @media(max-width:1500px){.top2 .brand small{display:none}#p-t{display:none}}
 @media(max-width:1280px){#basal .lb{display:none}#basal{padding:8px 10px}.top2 .brand b{display:none}}
 @media(max-width:1000px){#p-disp,#p-run{display:none}.top2{padding:0 10px}}
+
+/* v8: lista de atalhos */
+.kbgrid{display:grid;grid-template-columns:auto 1fr;gap:9px 16px;align-items:center;font-size:13.5px}.kbgrid kbd{justify-self:start;min-width:34px;text-align:center;padding:4px 9px;border-radius:8px;border:1px solid var(--bd);background:#0a110e;color:var(--acc);font:700 12px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;box-shadow:0 2px 0 #000}.kbgrid span{color:var(--fg)}

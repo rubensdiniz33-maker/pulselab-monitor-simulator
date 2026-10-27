@@ -367,7 +367,7 @@ const DEFAULT_DISPLAY = { speed: 25, speed2: 6.25, gain: 1, capScale: 50, grid: 
 function defaultSession() {
   const v = SCENARIOS[0].ph[0].v;
   return {
-    schema: 2, rev: 1, epoch: 1, epochT: 0, seed: 20261021, ctrl: '', shockT: 0,
+    schema: 2, rev: 1, epoch: 1, epochT: 0, seed: 20261021, ctrl: '', shockT: 0, simT0: null,
     clock: { running: true, wall0: Date.now(), rt0: SIM0, pt0: 0, rate: 1 },
     rhythm: 'sinus', vf: 'coarse', ectopy: 0, st: 0, cpr: false, var: true,
     p: { from: Object.assign({}, v), to: Object.assign({}, v), t0: 0, dur: 0 },
@@ -385,7 +385,7 @@ function sanitize(raw) {
   if (raw.schema !== 2 && raw.hr !== undefined) return migrateV1(raw);
   if (raw.schema !== 2) return D;
   const S = Object.assign({}, D, raw);
-  S.shockT = num(raw.shockT, 0, 1e9, 0); S.rev = num(raw.rev, 1, 1e9, 1); S.epoch = num(raw.epoch, 1, 1e9, 1); S.epochT = num(raw.epochT, 0, 1e9, 0); S.seed = num(raw.seed, 1, 4e9, D.seed);
+  S.shockT = num(raw.shockT, 0, 1e9, 0); S.simT0 = raw.simT0 == null ? null : num(raw.simT0, 0, 1e9, 0); S.rev = num(raw.rev, 1, 1e9, 1); S.epoch = num(raw.epoch, 1, 1e9, 1); S.epochT = num(raw.epochT, 0, 1e9, 0); S.seed = num(raw.seed, 1, 4e9, D.seed);
   S.rhythm = RHYTHMS.includes(raw.rhythm) ? raw.rhythm : 'sinus'; S.vf = raw.vf === 'fine' ? 'fine' : 'coarse';
   S.ectopy = num(raw.ectopy, 0, 30, 0); S.st = num(raw.st, -0.5, 0.8, 0); S.cpr = !!raw.cpr; S.var = raw.var !== false;
   S.clock = Object.assign({}, D.clock, raw.clock); S.clock.rate = clamp(Number(S.clock.rate) || 1, 1, 20); S.clock.running = !!S.clock.running;

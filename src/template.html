@@ -346,44 +346,54 @@ function startDisplay() {
   let noiseBuf = null, cuff = null, cuffTick = -1, cuffExh = false, cuffSeq = -1, cuffDemoOn = false;
   function noiseBuffer() { if (!noiseBuf) { noiseBuf = actx.createBuffer(1, Math.floor(actx.sampleRate), actx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } return noiseBuf; }
   function cuffStart() {
-    const out = actx.createGain(); out.gain.value = 0; out.connect(actx.destination);
-    const mo = actx.createOscillator(); mo.type = 'sawtooth'; mo.frequency.value = 58;
-    const mf = actx.createBiquadFilter(); mf.type = 'lowpass'; mf.frequency.value = 460;
+    /* barramento -> passa-baixas (tira qualquer aspereza) -> saída */
+    const out = actx.createGain(); out.gain.value = 0; const sm = actx.createBiquadFilter(); sm.type = 'lowpass'; sm.frequency.value = 3800; sm.Q.value = 0.4; out.connect(sm); sm.connect(actx.destination);
+    /* motor/diafragma: serra grave filtrada, com pulsação de cursos da bomba (AM suave) */
+    const mo = actx.createOscillator(); mo.type = 'sawtooth'; mo.frequency.value = 42;
+    const mf = actx.createBiquadFilter(); mf.type = 'lowpass'; mf.frequency.value = 380; mf.Q.value = 0.6;
     const mg = actx.createGain(); mg.gain.value = 0;
-    const lfo = actx.createOscillator(); lfo.frequency.value = 23; const lg = actx.createGain(); lg.gain.value = 0; lfo.connect(lg); lg.connect(mg.gain);
+    const lfo = actx.createOscillator(); lfo.frequency.value = 14; const lg = actx.createGain(); lg.gain.value = 0; lfo.connect(lg); lg.connect(mg.gain);
     mo.connect(mf); mf.connect(mg); mg.connect(out);
+    /* ar passando pela mangueira */
     const n = actx.createBufferSource(); n.buffer = noiseBuffer(); n.loop = true;
-    const nf = actx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 600; nf.Q.value = 0.7;
+    const nf = actx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 500; nf.Q.value = 0.6;
     const ng = actx.createGain(); ng.gain.value = 0; n.connect(nf); nf.connect(ng); ng.connect(out);
     mo.start(); lfo.start(); n.start();
-    return { out, mo, mf, mg, lfo, lg, n, nf, ng };
+    return { out, sm, mo, mf, mg, lfo, lg, n, nf, ng };
   }
+  /* degrau da válvula na deflação: «tsst» curto e macio (ataque de 10 ms, sem estalo) */
   function cuffClick(t) {
-    const s = actx.createBufferSource(); s.buffer = noiseBuffer(); const f = actx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1900; f.Q.value = 1.2;
-    const g = actx.createGain(); g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.05); s.connect(f); f.connect(g); g.connect(cuff.out); s.start(t, Math.random() * 0.5, 0.06);
-    const th = actx.createOscillator(), tg = actx.createGain(); th.frequency.value = 150; tg.gain.setValueAtTime(0.5, t); tg.gain.exponentialRampToValueAtTime(0.001, t + 0.05); th.connect(tg); tg.connect(cuff.out); th.start(t); th.stop(t + 0.06);
+    const s = actx.createBufferSource(); s.buffer = noiseBuffer(); const f = actx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2300; f.Q.value = 0.8;
+    const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.2, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0005, t + 0.16); s.connect(f); f.connect(g); g.connect(cuff.out); s.start(t, Math.random() * 0.5, 0.18);
+    const th = actx.createOscillator(); th.type = 'sine'; const tg = actx.createGain(); th.frequency.setValueAtTime(190, t); th.frequency.exponentialRampToValueAtTime(120, t + 0.07);
+    tg.gain.setValueAtTime(0.0001, t); tg.gain.linearRampToValueAtTime(0.14, t + 0.008); tg.gain.exponentialRampToValueAtTime(0.0005, t + 0.09); th.connect(tg); tg.connect(cuff.out); th.start(t); th.stop(t + 0.1);
   }
+  /* esvaziamento final: «psssh» longo e suave */
   function cuffExhaust(t) {
-    const s = actx.createBufferSource(); s.buffer = noiseBuffer(); s.loop = true; const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(4200, t); f.frequency.exponentialRampToValueAtTime(500, t + 1.1);
-    const g = actx.createGain(); g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.002, t + 1.15); s.connect(f); f.connect(g); g.connect(cuff.out); s.start(t); s.stop(t + 1.2);
+    const s = actx.createBufferSource(); s.buffer = noiseBuffer(); s.loop = true; const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(3200, t); f.frequency.exponentialRampToValueAtTime(450, t + 1.3);
+    const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.26, t + 0.06); g.gain.exponentialRampToValueAtTime(0.002, t + 1.4); s.connect(f); f.connect(g); g.connect(cuff.out); s.start(t); s.stop(t + 1.5);
   }
   function cuffUpdate(el, vol, seq) {
     if (!cuff) { cuff = cuffStart(); cuffTick = -1; cuffExh = false; cuffSeq = seq; }
     if (seq !== cuffSeq) { cuffSeq = seq; cuffTick = -1; cuffExh = false; }
     const t = actx.currentTime, V = cuff;
-    V.out.gain.setTargetAtTime(vol, t, 0.05);
+    V.out.gain.setTargetAtTime(vol, t, 0.08);
     if (el < 10) {
-      const p = el / 10; V.mo.frequency.setTargetAtTime(58 + 40 * p, t, 0.06); V.mf.frequency.setTargetAtTime(460 + 380 * p, t, 0.06);
-      V.mg.gain.setTargetAtTime(0.55, t, 0.03); V.lg.gain.setTargetAtTime(0.22, t, 0.03); V.ng.gain.setTargetAtTime(0.1 + 0.05 * p, t, 0.1); V.nf.frequency.setTargetAtTime(600 + 500 * p, t, 0.1);
+      const p = el / 10;
+      /* a bomba acelera ao ligar e o tom sobe devagar conforme a pressão aumenta */
+      V.mo.frequency.setTargetAtTime(62 + 34 * p, t, 0.35); V.mf.frequency.setTargetAtTime(380 + 360 * p, t, 0.25);
+      V.lfo.frequency.setTargetAtTime(15 + 7 * p, t, 0.3);
+      V.mg.gain.setTargetAtTime(0.42, t, 0.18); V.lg.gain.setTargetAtTime(0.16, t, 0.18); V.ng.gain.setTargetAtTime(0.07 + 0.04 * p, t, 0.2); V.nf.frequency.setTargetAtTime(500 + 450 * p, t, 0.2);
     } else {
-      V.mg.gain.setTargetAtTime(0, t, 0.04); V.lg.gain.setTargetAtTime(0, t, 0.04); V.ng.gain.setTargetAtTime(0.025, t, 0.2); V.nf.frequency.setTargetAtTime(3200, t, 0.1);
+      /* bomba desliga: o motor perde rotação em ~0,3 s (sem corte seco) */
+      V.mo.frequency.setTargetAtTime(38, t, 0.18); V.mg.gain.setTargetAtTime(0, t, 0.12); V.lg.gain.setTargetAtTime(0, t, 0.12); V.ng.gain.setTargetAtTime(0.02, t, 0.25); V.nf.frequency.setTargetAtTime(2400, t, 0.15);
       const idx = Math.floor((el - 10) / 1.5); if (idx !== cuffTick) { cuffTick = idx; cuffClick(t); }
       if (!cuffExh && el >= NIBP_SECONDS - 1.3) { cuffExh = true; cuffExhaust(t); }
     }
   }
   function cuffStop() {
-    const V = cuff; if (!V) return; cuff = null; const t = actx.currentTime; V.out.gain.setTargetAtTime(0, t, 0.03);
-    setTimeout(() => { for (const x of [V.mo, V.lfo, V.n]) { try { x.stop(); } catch (e) {} } try { V.out.disconnect(); } catch (e) {} }, 500);
+    const V = cuff; if (!V) return; cuff = null; const t = actx.currentTime; V.out.gain.setTargetAtTime(0, t, 0.05);
+    setTimeout(() => { for (const x of [V.mo, V.lfo, V.n]) { try { x.stop(); } catch (e) {} } try { V.out.disconnect(); V.sm.disconnect(); } catch (e) {} }, 500);
   }
   function cuffFrame(T) {
     const N = S.nibp, A = S.audio;
@@ -427,7 +437,7 @@ function startDisplay() {
      não reduz quando a janela está em segundo plano — por isso o som continua mesmo com outra aba/janela na frente. */
   function tick() {
     const T = clockT(S.clock, now());
-    core.advance(T); beeps(T); cuffFrame(T);
+    core.advance(T); beeps(T); try { cuffFrame(T); } catch (e) {}
     if (performance.now() - lastNum > 250) { lastNum = performance.now(); nums(T); }
     return T;
   }
@@ -459,14 +469,14 @@ function startConsole() {
   var RM = null; let S = loadS(), readOnly = false, live = true, tab = 'al', draft = null, dtimer = null;
   const now = () => Date.now(), curT = () => clockT(S.clock, now()), curP = () => clockP(S.clock, now());
   const displays = new Map(), LOG = [], seenAl = new Set();
-  const simT = () => { const T = Math.max(0, curT() - SIM0); return Math.floor(T / 60) + ':' + String(Math.floor(T % 60)).padStart(2, '0'); };
+  const simT = () => { const T = Math.max(0, Math.floor(curT() - (S.simT0 == null ? SIM0 : S.simT0))), h = Math.floor(T / 3600), m = Math.floor(T % 3600 / 60), ss = String(T % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; };
   const logEv = txt => { LOG.unshift([simT(), txt]); if (LOG.length > 40) LOG.pop(); };
   function mkDraft() { const t = truth(S, curP()); const d = { rhythm: S.rhythm, ectopy: S.ectopy, vf: S.vf, dur: draft ? draft.dur : 0, couple: draft ? draft.couple : true }; KEYS.forEach(k => d[k] = Math.round(S.p.to[k] * 10) / 10); d.sys = S.p.to.sys; d.dia = S.p.to.dia; return d; }
   draft = mkDraft();
 
   const dbg = $('root');
   dbg.innerHTML = `
-<div class="top2"><div class="brand"><img class="logo" src="${LOGO}" alt=""><div><b>PULSELAB</b><small>Simulador de monitor multiparamétrico</small></div></div><div class="pills"><span class="pill" id="p-mode"><i></i><span></span></span><span class="pill" id="p-disp"><i></i><span></span></span><span class="pill" id="p-run"><i></i><span></span></span><span class="pill" id="p-t"><i></i><span></span></span></div><div class="acts"><div class="seg" role="group" aria-label="Tempo da simulação"><button class="btn ghost" id="run" title="Retomar a simulação (Espaço)" aria-label="Retomar">${ic('play')}</button><button class="btn ghost" id="pause" title="Congelar a simulação (Espaço)" aria-label="Congelar">${ic('pause')}</button></div><button class="btn ghost" id="restart" title="Reiniciar o traçado" aria-label="Reiniciar traçado">${ic('restart')}</button><button class="btn bas" id="basal" title="Voltar ao cenário basal">${ic('refresh')}<span class="lb">Restaurar basal</span></button><span class="vsep"></span><button class="btn ghost" id="mutebtn" title="Silenciar ou ativar todo o som da projeção"></button><button class="btn ghost" id="phone" title="Controlar pelo celular"></button><button class="btn ghost" id="openfs" title="Abrir projeção em tela cheia" aria-label="Projeção em tela cheia">${ic('expand')}</button><button class="btn pri" id="open" title="Abrir a projeção em uma janela">${ic('monitor')}<span class="lb">Abrir projeção</span></button></div></div>
+<div class="top2"><div class="brand"><img class="logo" src="${LOGO}" alt=""><div><b>PULSELAB</b><small>Simulador de monitor multiparamétrico</small></div></div><div class="pills"><span class="pill" id="p-mode"><i></i><span></span></span><span class="pill" id="p-disp"><i></i><span></span></span><span class="pill" id="p-run"><i></i><span></span></span><span class="pill" id="p-t"><i></i><span></span></span></div><div class="acts"><div class="seg" role="group" aria-label="Tempo da simulação"><button class="btn ghost" id="run" title="Retomar a simulação (Espaço)" aria-label="Retomar">${ic('play')}</button><button class="btn ghost" id="pause" title="Congelar a simulação (Espaço)" aria-label="Congelar">${ic('pause')}</button></div><button class="btn ghost" id="restart" title="Reiniciar o traçado" aria-label="Reiniciar traçado">${ic('restart')}</button><button class="btn bas" id="basal" title="Voltar ao cenário basal (R)">${ic('refresh')}<span class="lb">Restaurar basal</span></button><span class="vsep"></span><button class="btn ghost" id="mutebtn" title="Silenciar ou ativar todo o som da projeção (M)"></button><button class="btn ghost" id="phone" title="Controlar pelo celular"></button><button class="btn ghost" id="openfs" title="Abrir projeção em tela cheia (Shift+P)" aria-label="Projeção em tela cheia">${ic('expand')}</button><button class="btn pri" id="open" title="Abrir a projeção em uma janela (P)">${ic('monitor')}<span class="lb">Abrir projeção</span></button></div></div>
 <div class="ro hide" id="ro"><b>Outro console assumiu o controle desta sessão.</b><span>Este está somente leitura.</span><button class="btn" id="take">Assumir controle</button></div>
 <div class="cwrap">
 <aside class="lcol">
@@ -474,7 +484,7 @@ function startConsole() {
 <section class="panel"><div class="ph"><span>${ic('sliders')} Simulação</span></div><div class="pb"><div class="row"><span class="hint">Tempo da aula</span><span id="rates" class="row"></span></div><label class="chk" style="margin-top:10px"><input type="checkbox" id="auto"> Evolução automática das fases</label><div style="margin-top:12px" id="phbox"></div></div></section>
 </aside>
 <section class="mcol">
-<section class="panel"><div class="ph"><span>${ic('stetho')} Paciente</span><span class="hint">Espaço congela · 1–9 cenários · A silencia · B bip</span></div><div class="pb" id="pg-pt"></div></section>
+<section class="panel"><div class="ph"><span>${ic('stetho')} Paciente</span><span class="hint">Espaço congela · R basal · 1–9 cenários · ? atalhos</span></div><div class="pb" id="pg-pt"></div></section>
 <section class="panel"><div class="ph"><span>${ic('pulse')} Estado do paciente e registro da aula</span><span class="hint" id="kp-src"></span></div><div class="pb"><div class="chips" id="chips"></div><div class="kpis" id="kpis"></div><div class="cols2" style="margin-top:18px"><div><div class="sgrp" style="padding:0 0 8px;position:static;background:none">Alvos programados</div><div class="kv" id="kv"></div><div id="alarms" style="margin-top:14px"></div></div><div><div class="sgrp" style="padding:0 0 8px;position:static;background:none">Registro da sessão</div><div id="log" class="hint" style="display:flex;flex-direction:column;gap:3px"></div></div></div></div></section>
 </section>
 <aside class="rcol">
@@ -496,7 +506,7 @@ function startConsole() {
     commit(n => {
       n.rhythm = sc.rhythm; n.ectopy = sc.ectopy || 0; n.st = sc.ph[0].st || 0; n.cpr = false; n.vf = 'coarse';
       setTargets(n, rhythmRules(sc.ph[0].v, sc.rhythm, false), Math.max(sc.ph[0].dur, 8));
-      const P = TtoP(n.clock, clockT(n.clock, now())); n.scen = { id, phase: 0, startP: P, auto: n.scen.auto !== false };
+      const P = TtoP(n.clock, clockT(n.clock, now())); n.scen = { id, phase: 0, startP: P, auto: n.scen.auto !== false }; n.simT0 = clockT(n.clock, now());
       if (n.nibp.every > 0 && n.nibp.state !== 'meas' && !PULSELESS.has(sc.rhythm)) { const T = clockT(n.clock, now()); n.nibp.seq++; n.nibp.state = 'meas'; n.nibp.startT = T; n.nibp.nextT = T + Math.max(n.nibp.every, 45); }
     });
     logEv('Cenário: ' + sc.name); draft = mkDraft(); renderAll(); toast('Cenário: ' + sc.name);
@@ -686,12 +696,36 @@ ${sel('d-grid', 'Grade do ECG (1 mm / 5 mm)', [['1', 'Ligada'], ['0', 'Desligada
   $('open').onclick = () => openProj(false); $('openfs').onclick = () => openProj(true);
   function projUrl() { const u = new URL(location.href); u.search = ''; u.searchParams.set('mode', 'projection'); return u.href; }
   $('tabs').querySelectorAll('.tab').forEach(b => b.onclick = () => { tab = b.dataset.tab; $('tabs').querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('.page').forEach(p => p.classList.toggle('on', p.id === 'pg-' + tab)); });
+  /* ---- atalhos de teclado ---- */
+  const KB = [['Espaço', 'Congelar / retomar'], ['R', 'Restaurar o cenário basal'], ['1 – 9', 'Cenários 1 a 9 da lista'], ['→  ←', 'Próxima fase / fase anterior'], ['A', 'Silenciar alarmes por 2 min'], ['M', 'Som da projeção: ligar / mudo'], ['B', 'Bip da FC: ligar / desligar'], ['N', 'Medir a PNI agora'], ['C', 'RCP: iniciar / interromper'], ['D', 'Choque (ou cardioversão no ritmo certo)'], ['E', 'RCE: retorno da circulação'], ['P', 'Abrir a projeção em janela'], ['Shift + P', 'Projeção em tela cheia'], ['?', 'Mostrar esta lista']];
+  const kmod = document.createElement('div'); kmod.className = 'modal hide'; kmod.id = 'kbmodal'; kmod.setAttribute('role', 'dialog'); kmod.setAttribute('aria-modal', 'true'); kmod.setAttribute('aria-label', 'Atalhos de teclado');
+  kmod.innerHTML = `<div class="mbox"><div class="mh"><b style="display:inline-flex;gap:9px;align-items:center">${ic('sliders')} Atalhos de teclado</b><button class="btn sm" id="kb-x" aria-label="Fechar">${ic('x')}</button></div><div class="mb"><div class="kbgrid">${KB.map(r => `<kbd>${r[0]}</kbd><span>${r[1]}</span>`).join('')}</div><div class="hint">Os atalhos não funcionam enquanto você digita em um campo.</div></div></div>`;
+  document.body.appendChild(kmod);
+  const kbToggle = on => kmod.classList.toggle('hide', on === undefined ? !kmod.classList.contains('hide') : !on);
+  kmod.addEventListener('click', e => { if (e.target === kmod) kbToggle(false); }); $('kb-x').onclick = () => kbToggle(false);
+  const PULSELESS_OK = () => PULSELESS.has(S.rhythm), SHOCKABLE = () => ['vf', 'vtp', 'vt', 'tdp'].includes(S.rhythm);
   window.addEventListener('keydown', e => {
-    if (/INPUT|SELECT|TEXTAREA/.test((e.target || {}).tagName || '') && e.key !== 'Escape') return;
-    if (e.key === ' ') { e.preventDefault(); commit(n => reanchor(n, !n.clock.running)); }
-    else if (/^[1-9]$/.test(e.key)) applyScenario(SCENARIOS[Number(e.key) - 1].id);
-    else if (e.key === 'a' || e.key === 'A') commit(n => n.alarm.silencedUntil = now() + 120000);
-    else if (e.key === 'b' || e.key === 'B') { commit(n => n.audio.beep = !n.audio.beep); toast(S.audio.beep ? 'Bip de FC ligado' : 'Bip de FC desligado'); }
+    if (e.key === 'Escape') { kbToggle(false); return; }
+    if (/INPUT|SELECT|TEXTAREA/.test((e.target || {}).tagName || '') || e.isComposing) return;
+    if (e.key === '?') { e.preventDefault(); kbToggle(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (document.querySelector('.modal:not(.hide)')) return;
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (e.repeat && k !== ' ') return;
+    if (k === ' ') { e.preventDefault(); if (!readOnly) commit(n => reanchor(n, !n.clock.running)); }
+    else if (k === 'p') { openProj(e.shiftKey); }
+    else if (readOnly) return;
+    else if (/^[1-9]$/.test(k)) applyScenario(SCENARIOS[Number(k) - 1].id);
+    else if (k === 'r') applyScenario('basal');
+    else if (k === 'a') { commit(n => n.alarm.silencedUntil = now() + 120000); toast('Alarmes silenciados por 2 min'); }
+    else if (k === 'm') { commit(n => { n.audio.mute = !n.audio.mute; }); toast(S.audio.mute ? 'Som da projeção desligado' : 'Som da projeção ligado'); }
+    else if (k === 'b') { commit(n => n.audio.beep = !n.audio.beep); toast(S.audio.beep ? 'Bip de FC ligado' : 'Bip de FC desligado'); }
+    else if (k === 'n') { if (PULSELESS_OK()) toast('PNI indisponível em parada cardíaca'); else { startNibp(); toast('Medindo a pressão…'); } }
+    else if (k === 'c') { if (PULSELESS_OK()) toggleCpr(); else toast('RCP só em ritmo de parada'); }
+    else if (k === 'd') { if (SHOCKABLE()) shock(); else toast('Choque indisponível neste ritmo'); }
+    else if (k === 'e') { if (PULSELESS_OK()) rce(); else toast('RCE só após parada cardíaca'); }
+    else if (k === 'ArrowRight') { goPhase(S.scen.phase + 1); }
+    else if (k === 'ArrowLeft') { goPhase(S.scen.phase - 1); }
   });
 
   /* ---- transporte ---- */
@@ -706,6 +740,7 @@ ${sel('d-grid', 'Grade do ECG (1 mm / 5 mm)', [['1', 'Ligada'], ['0', 'Desligada
     else if (m.t === 'state' && m.id !== myId && readOnly && m.s) { S = sanitize(m.s); draft = mkDraft(); renderAll(); }
   };
   claim();
+  if (!readOnly && S.simT0 == null) commit(n => { n.simT0 = clockT(n.clock, now()); });
 /*HOST_JS*/
   setInterval(() => { if (!readOnly) post({ t: 'chb', rev: S.rev }); }, 2000);
   /* ---- painel de estado ---- */
